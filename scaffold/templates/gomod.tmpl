@@ -1,0 +1,8 @@
+module {{.Module}}
+
+go 1.22.2
+
+require github.com/vincentsch/rungrad v0.2.1
+{{if .RungradReplace}}
+replace github.com/vincentsch/rungrad => {{.RungradReplace}}
+{{end}}

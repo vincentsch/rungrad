@@ -1,0 +1,189 @@
+// Command {{.Name}} is a product CLI built on the rungrad framework.
+package main
+
+import (
+	"io"
+	"os"
+	"sort"
+
+	"github.com/spf13/cobra"
+	rungrad "github.com/vincentsch/rungrad"
+	"github.com/vincentsch/rungrad/manifest"
+	"github.com/vincentsch/rungrad/output"
+	"github.com/vincentsch/rungrad/update"
+)
+
+// version is the single source of truth for the build version, the update
+// command's current version, and the offline fetcher's reported release.
+const version = "v0.1.0"
+
+type widget struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+var widgets = []widget{ {ID: "1", Name: "alpha"}, {ID: "2", Name: "beta"} }
+
+// sortedWidgets copies before sorting so list output is stable without mutating
+// the shared fixture used by in-process tests.
+func sortedWidgets() []widget {
+	out := append([]widget(nil), widgets...)
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
+}
+
+// fixedFetcher reports a single release without contacting the network, so the
+// generated `update --check` is deterministic and offline.
+//
+// To distribute real releases, replace fixedFetcher with a network fetcher:
+//   Fetcher: update.GitHubFetcher{Owner: {{goquote .ReleaseOwner}}, Repo: {{goquote .ReleaseRepo}}},
+type fixedFetcher struct{ version string }
+
+func (f fixedFetcher) Latest() (update.Release, error) {
+	return update.Release{Version: f.version}, nil
+}
+
+func newApp() *rungrad.App {
+	app := rungrad.New(rungrad.AppConfig{
+		Name:    "{{.Name}}",
+		Short:   {{goquote .ProductName}},
+		Long:    {{goquote .Description}},
+		Version: version,
+		EnvVar:  "{{.EnvVar}}",
+		Resolution: &rungrad.ResolutionConfig{
+			Profile:        true,
+			ProfileEnvVar:  "{{.ProfileEnvVar}}",
+			AuthFile:       true,
+			AuthFileEnvVar: "{{.AuthFileEnvVar}}",
+			ConfigEnvVar:   "{{.ConfigEnvVar}}",
+			Services: []rungrad.Service{
+{{range .Services}}				{Name: "{{.Name}}", Flag: "{{.Flag}}", EnvVar: "{{.EnvVar}}", ConfigKey: "{{.ConfigKey}}", Default: {{goquote .Default}}, Usage: {{goquote .Usage}}},
+{{end}}			},
+		},
+{{if .HostSurface}}		// Host-owned global flags: the product owns flag registration, but every
+		// flag still drives rungrad machine output, resolution, and manifest
+		// behavior. Version, completion, and the manifest endpoint stay
+		// rungrad-owned. Leaving Usage empty reuses the canonical rungrad usage.
+		Surface: rungrad.SurfaceConfig{
+			GlobalFlags: rungrad.GlobalFlagSurface{
+				Mode: rungrad.SurfaceHostOwned,
+				Bindings: rungrad.GlobalFlagBindings{
+					JSON:     rungrad.GlobalFlagBinding{Name: "json"},
+					DryRun:   rungrad.GlobalFlagBinding{Name: "dry-run"},
+					NoPrompt: rungrad.GlobalFlagBinding{Name: "no-prompt"},
+					Quiet:    rungrad.GlobalFlagBinding{Name: "quiet"},
+					Config:   rungrad.GlobalFlagBinding{Name: "config"},
+					Profile:  rungrad.GlobalFlagBinding{Name: "profile"},
+					AuthFile: rungrad.GlobalFlagBinding{Name: "auth-file"},
+					Services: map[string]rungrad.GlobalFlagBinding{
+{{range .Services}}						"{{.Name}}": {Name: "{{.Flag}}"},
+{{end}}					},
+				},
+			},
+		},
+{{else}}		// Global flags are rungrad-owned (the default). Pass --surface host to the
+		// scaffolder to generate the host-owned binding variant instead.
+{{end}}	})
+	// Keep root related-command text as help prose only. The manifest root entry
+	// should have related: [] because it has no command annotation.
+	app.Root().Example = {{goquote (joinLines .RootExamples)}}
+	app.Root().Long += "\n\nRelated commands:\n  {{.Name}} widget list\n  {{.Name}} update"
+
+	widgetCmd := &rungrad.Command{Use: "widget", Short: "Work with widgets"}
+	widgetCmd.AddCommand(
+		&rungrad.Command{
+			Use:      "list",
+			Short:    "List widgets",
+			Examples: []string{ {{range .WidgetListExamples}}{{goquote .}}, {{end}} },
+			Related:     []string{"{{.Name}} widget create"},
+			OutputModes: []string{"table", "json"},
+			Extensions: manifest.ExtensionSet{
+				"{{.MetadataNamespace}}": {
+					"owner":  "platform",
+					"status": "stable",
+				},
+			},
+			Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+				data := sortedWidgets()
+				return f.WriteResult(data, func(w io.Writer) {
+					rows := make([][]string, 0, len(data))
+					for _, it := range data {
+						rows = append(rows, []string{it.ID, it.Name})
+					}
+					output.RenderTable(w, output.Table{Columns: []string{"ID", "Name"}, Rows: rows, Empty: "No widgets."})
+				})
+			},
+		},
+		&rungrad.Command{
+			Use:      "create <name>",
+			Short:    "Create a widget",
+			Examples: []string{ {{range .WidgetCreateExamples}}{{goquote .}}, {{end}} },
+			Related:     []string{"{{.Name}} widget list"},
+			OutputModes: []string{"table", "json"},
+			Mutates:     true,
+			Args:        cobra.ExactArgs(1),
+			Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+				summary := output.MutationSummary{Action: "Created", Resource: "widget", Name: args[0]}
+				if f.DryRun() {
+					api, _ := f.Service("{{.PrimaryService}}")
+					return f.WritePreview(output.DryRunPreview{
+						Method: "POST", Path: api.Value + "/widgets",
+						Body: []output.Field{
+							{Name: "name", Value: args[0]},
+							// A masked secret field shows how dry-run previews hide credentials.
+							{Name: "token", Value: "scaffold-secret", Secret: true},
+						},
+					})
+				}
+				return f.WriteResult(summary, func(w io.Writer) { output.RenderMutation(w, summary) })
+			},
+		},
+		&rungrad.Command{
+			Use:      "delete <name>",
+			Short:    "Delete a widget",
+			Examples: []string{ {{range .WidgetDeleteExamples}}{{goquote .}}, {{end}} },
+			Related:     []string{"{{.Name}} widget list"},
+			OutputModes: []string{"table", "json"},
+			Destructive: true, // implies Mutates: the command honors --dry-run
+			Args:        cobra.ExactArgs(1),
+			Configure: func(cmd *cobra.Command) {
+				cmd.Flags().Bool("confirm", false, "Confirm the destructive action without a prompt")
+			},
+			Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+				// Operate on the supplied name directly; a starter does not need name
+				// resolution to demonstrate destructive confirmation.
+				if f.DryRun() {
+					api, _ := f.Service("{{.PrimaryService}}")
+					return f.WritePreview(output.DryRunPreview{Method: "DELETE", Path: api.Value + "/widgets/" + args[0]})
+				}
+				confirmed, _ := cmd.Flags().GetBool("confirm")
+				if err := f.ConfirmDestructive(rungrad.ConfirmOptions{
+					Action:    "delete widget",
+					Target:    args[0],
+					Confirmed: confirmed,
+				}); err != nil {
+					return err
+				}
+				// Offline starter: report the deletion without mutating the in-memory
+				// widgets slice, so repeated runs and tests stay deterministic.
+				summary := output.MutationSummary{Action: "Deleted", Resource: "widget", Name: args[0]}
+				return f.WriteResult(summary, func(w io.Writer) { output.RenderMutation(w, summary) })
+			},
+		},
+	)
+
+	// Keep the update command in a variable so product examples can be appended
+	// before AddCommand builds the Cobra command tree.
+	upd := update.Command(update.CommandConfig{
+		CurrentVersion: version,
+		Fetcher:        fixedFetcher{version: version},
+		ToolName:       "{{.Name}}",
+	})
+{{range .UpdateExamples}}	upd.Examples = append(upd.Examples, {{goquote .}})
+{{end}}	app.AddCommand(widgetCmd, upd)
+	return app
+}
+
+func main() {
+	os.Exit(newApp().Run(os.Args[1:], os.Stdout, os.Stderr))
+}

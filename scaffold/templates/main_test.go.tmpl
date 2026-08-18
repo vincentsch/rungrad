@@ -1,0 +1,249 @@
+package main
+
+import (
+	"encoding/json"
+	"reflect"
+	"strings"
+	"testing"
+
+	rungrad "github.com/vincentsch/rungrad"
+	"github.com/vincentsch/rungrad/manifest"
+	"github.com/vincentsch/rungrad/testutil"
+)
+
+// findManifestCommand returns the manifest entry for a command path, with no
+// path meaning the root command.
+func findManifestCommand(m *manifest.Manifest, path ...string) *manifest.Command {
+	if path == nil {
+		path = []string{}
+	}
+	for i := range m.Commands {
+		if reflect.DeepEqual(m.Commands[i].Path, path) {
+			return &m.Commands[i]
+		}
+	}
+	return nil
+}
+
+func containsString(items []string, want string) bool {
+	for _, item := range items {
+		if item == want {
+			return true
+		}
+	}
+	return false
+}
+
+func TestWidgetListJSON(t *testing.T) {
+	res := testutil.Run(newApp(), "widget", "list", "--json")
+	if res.Exit != rungrad.ExitSuccess {
+		t.Fatalf("widget list --json exit %d: %s", res.Exit, res.Stderr)
+	}
+	var got []widget
+	testutil.AssertStableJSON(t, res.Stdout, &got)
+}
+
+func TestWidgetCreateDryRunMasksSecret(t *testing.T) {
+	res := testutil.Run(newApp(), "widget", "create", "gamma", "--dry-run")
+	if res.Exit != rungrad.ExitSuccess {
+		t.Fatalf("widget create --dry-run exit %d: %s", res.Exit, res.Stderr)
+	}
+	if strings.Contains(res.Stdout, "scaffold-secret") {
+		t.Fatalf("dry-run leaked the secret value: %s", res.Stdout)
+	}
+	if !strings.Contains(res.Stdout, "***") {
+		t.Fatalf("dry-run did not mask the secret field: %s", res.Stdout)
+	}
+}
+
+func TestWidgetDeleteDryRun(t *testing.T) {
+	res := testutil.Run(newApp(), "widget", "delete", "alpha", "--dry-run")
+	if res.Exit != rungrad.ExitSuccess {
+		t.Fatalf("widget delete --dry-run exit %d: %s", res.Exit, res.Stderr)
+	}
+	if !strings.Contains(strings.ToLower(res.Stdout), "dry") {
+		t.Fatalf("widget delete --dry-run is not a preview: %q", res.Stdout)
+	}
+	if strings.Contains(strings.ToLower(res.Stdout), "deleted ") {
+		t.Fatalf("widget delete --dry-run reported a completed deletion: %q", res.Stdout)
+	}
+}
+
+func TestWidgetDeleteNoPromptRequiresConfirm(t *testing.T) {
+	res := testutil.Run(newApp(), "widget", "delete", "alpha", "--no-prompt")
+	if res.Exit != rungrad.ExitUsage {
+		t.Fatalf("widget delete --no-prompt exit %d, want %d (stderr=%q)", res.Exit, rungrad.ExitUsage, res.Stderr)
+	}
+}
+
+func TestWidgetDeleteJSONRequiresConfirm(t *testing.T) {
+	res := testutil.Run(newApp(), "widget", "delete", "alpha", "--json")
+	if res.Exit != rungrad.ExitUsage {
+		t.Fatalf("widget delete --json exit %d, want %d", res.Exit, rungrad.ExitUsage)
+	}
+	if strings.TrimSpace(res.Stdout) != "" {
+		t.Fatalf("widget delete --json refusal should leave stdout empty, got %q", res.Stdout)
+	}
+	var body struct {
+		ExitCode int `json:"exit_code"`
+	}
+	if err := json.Unmarshal([]byte(res.Stderr), &body); err != nil || body.ExitCode != 1 {
+		t.Fatalf("widget delete --json refusal stderr not a JSON error body with exit_code 1: %v\n%s", err, res.Stderr)
+	}
+}
+
+func TestWidgetDeleteConfirmKeepsFixture(t *testing.T) {
+	if res := testutil.Run(newApp(), "widget", "delete", "alpha", "--confirm"); res.Exit != rungrad.ExitSuccess {
+		t.Fatalf("widget delete --confirm exit %d: %s", res.Exit, res.Stderr)
+	}
+	// The scaffold demonstrates confirmation without changing the shared fixture,
+	// so generated tests stay repeatable in one process.
+	res := testutil.Run(newApp(), "widget", "list", "--json")
+	if res.Exit != rungrad.ExitSuccess {
+		t.Fatalf("widget list after delete exit %d: %s", res.Exit, res.Stderr)
+	}
+	if !strings.Contains(res.Stdout, "alpha") {
+		t.Fatalf("confirmed delete mutated the in-memory fixture; alpha missing: %q", res.Stdout)
+	}
+}
+
+func TestManifestValidity(t *testing.T) {
+	res := testutil.Run(newApp(), "__rungrad_manifest")
+	if res.Exit != rungrad.ExitSuccess {
+		t.Fatalf("manifest exit %d: %s", res.Exit, res.Stderr)
+	}
+	var m manifest.Manifest
+	if err := res.JSON(&m); err != nil {
+		t.Fatalf("manifest JSON: %v\n%s", err, res.Stdout)
+	}
+	if err := manifest.Validate(&m); err != nil {
+		t.Fatalf("Validate(manifest) = %v\n%s", err, res.Stdout)
+	}
+}
+
+func TestManifestRootEntry(t *testing.T) {
+	res := testutil.Run(newApp(), "__rungrad_manifest")
+	var m manifest.Manifest
+	if err := res.JSON(&m); err != nil {
+		t.Fatalf("manifest JSON: %v\n%s", err, res.Stdout)
+	}
+	root := findManifestCommand(&m)
+	if root == nil {
+		t.Fatal("missing root command")
+	}
+	wantExamples := []string{
+		"{{.Name}} widget list",
+		"{{.Name}} widget list --json",
+		"{{.Name}} widget create gamma --dry-run",
+	}
+	if !reflect.DeepEqual(root.Examples, wantExamples) {
+		t.Fatalf("root examples = %v, want %v", root.Examples, wantExamples)
+	}
+	// Root related command text is help prose, not manifest metadata.
+	if len(root.Related) != 0 {
+		t.Fatalf("root related = %v, want []", root.Related)
+	}
+	if len(root.LocalFlags) != 0 {
+		t.Fatalf("root local flags = %v, want []", root.LocalFlags)
+	}
+}
+
+func TestManifestWidgetCommands(t *testing.T) {
+	res := testutil.Run(newApp(), "__rungrad_manifest")
+	var m manifest.Manifest
+	if err := res.JSON(&m); err != nil {
+		t.Fatalf("manifest JSON: %v\n%s", err, res.Stdout)
+	}
+
+	// The scorer reads these manifest declarations before running black-box
+	// probes, so the generated tests pin the command metadata explicitly.
+	list := findManifestCommand(&m, "widget", "list")
+	if list == nil {
+		t.Fatal("missing widget list")
+	}
+	if list.Mutates || list.Destructive {
+		t.Fatalf("widget list metadata = %+v", list)
+	}
+	if !containsString(list.OutputModes, "table") || !containsString(list.OutputModes, "json") {
+		t.Fatalf("widget list output modes = %v", list.OutputModes)
+	}
+
+	create := findManifestCommand(&m, "widget", "create")
+	if create == nil || !create.Mutates || !create.SupportsDryRun || create.Destructive {
+		t.Fatalf("widget create metadata = %+v", create)
+	}
+
+	del := findManifestCommand(&m, "widget", "delete")
+	if del == nil || !del.Mutates || !del.Destructive || !del.RequiresConfirmation {
+		t.Fatalf("widget delete metadata = %+v", del)
+	}
+	var confirm *manifest.Flag
+	for i := range del.LocalFlags {
+		if del.LocalFlags[i].Name == "confirm" {
+			confirm = &del.LocalFlags[i]
+			break
+		}
+	}
+	if confirm == nil {
+		t.Fatalf("widget delete missing --confirm flag: %v", del.LocalFlags)
+	}
+	if confirm.Type != "bool" || confirm.Default != "false" || confirm.Required {
+		t.Fatalf("--confirm flag = %+v", confirm)
+	}
+}
+
+func TestManifestUpdate(t *testing.T) {
+	res := testutil.Run(newApp(), "__rungrad_manifest")
+	var m manifest.Manifest
+	if err := res.JSON(&m); err != nil {
+		t.Fatalf("manifest JSON: %v\n%s", err, res.Stdout)
+	}
+	upd := findManifestCommand(&m, "update")
+	if upd == nil {
+		t.Fatal("missing update command")
+	}
+	// update.Command derives examples from ToolName; the starter should never
+	// fall back to generic examples for a named project.
+	wantExamples := []string{
+		"{{.Name}} update --check",
+		"{{.Name}} update --check --json",
+		"{{.Name}} update",
+	}
+	if !reflect.DeepEqual(upd.Examples, wantExamples) {
+		t.Fatalf("update examples = %v, want %v", upd.Examples, wantExamples)
+	}
+	if len(upd.Related) != 0 {
+		t.Fatalf("update related = %v, want [] (no version subcommand)", upd.Related)
+	}
+	if !containsString(upd.OutputModes, "human") || !containsString(upd.OutputModes, "json") {
+		t.Fatalf("update output modes = %v", upd.OutputModes)
+	}
+}
+
+func TestHelpDocsManifestConsistent(t *testing.T) {
+	testutil.AssertConsistent(t, newApp)
+}
+
+func TestUpdateCheckJSON(t *testing.T) {
+	res := testutil.Run(newApp(), "update", "--check", "--json")
+	if res.Exit != rungrad.ExitSuccess {
+		t.Fatalf("update --check --json exit %d: %s", res.Exit, res.Stderr)
+	}
+	// The fixed fetcher reports the current version, making update checks
+	// deterministic and offline for the generated project.
+	var result struct {
+		Current   string `json:"current"`
+		Available bool   `json:"available"`
+		Status    string `json:"status"`
+	}
+	testutil.AssertStableJSON(t, res.Stdout, &result)
+	if result.Current != version {
+		t.Fatalf("update current = %q, want generated version %q", result.Current, version)
+	}
+	if result.Available {
+		t.Fatalf("offline starter reported an available update: %+v", result)
+	}
+	if result.Status != "up_to_date" {
+		t.Fatalf("update status = %q, want up_to_date", result.Status)
+	}
+}

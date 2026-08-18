@@ -1,0 +1,28 @@
+# Environment files with secrets
+.env
+
+# Build output
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+go.work.sum
+
+# Coverage
+coverage.txt
+*.cover
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.cache/
+.gocache/
+.gomodcache/
+.gopath/

@@ -1,0 +1,129 @@
+# Machine-readable rungrad spec ruleset. The conformance scorer reads this file.
+# Each rule maps a spec assertion to a probe the runner knows how to execute.
+version: rungrad-spec/1
+rules:
+  # Output contract
+  - id: output.json-parseable
+    section: output-contract
+    title: A read command with --json emits valid JSON
+    severity: required
+    probe: json-parseable
+  - id: output.dual-form
+    section: output-contract
+    title: A read command produces both human and JSON forms
+    severity: recommended
+    probe: dual-form-present
+
+  # Exit-code model
+  - id: exit.success-zero
+    section: exit-codes
+    title: A successful read command exits 0
+    severity: required
+    probe: success-exit-zero
+  - id: exit.unknown-usage
+    section: exit-codes
+    title: An unknown subcommand exits 1
+    severity: required
+    probe: unknown-subcommand-exit
+  - id: exit.missing-credential-auth
+    section: exit-codes
+    title: A command needing a credential, with none, exits 3
+    severity: required
+    probe: missing-credential-exit
+  - id: exit.not-found
+    section: exit-codes
+    title: Asking for a missing resource exits 5
+    severity: recommended
+    probe: not-found-exit
+  - id: exit.api-error
+    section: exit-codes
+    title: A command that hits an upstream or runtime error exits 2
+    severity: recommended
+    probe: api-error-exit
+  - id: exit.forbidden
+    section: exit-codes
+    title: A command refused for lacking permission exits 4
+    severity: recommended
+    probe: forbidden-exit
+  - id: exit.rate-limited
+    section: exit-codes
+    title: A command throttled by an upstream service exits 6
+    severity: recommended
+    probe: rate-limited-exit
+
+  # Dry run
+  - id: dryrun.accepted
+    section: dry-run
+    title: A mutating command accepts --dry-run and exits 0
+    severity: required
+    probe: dry-run-accepted
+  - id: dryrun.no-side-effects
+    section: dry-run
+    title: --dry-run previews without reporting a completed mutation
+    severity: required
+    probe: dry-run-no-side-effects
+  - id: dryrun.destructive-preview
+    section: dry-run
+    title: A destructive command previews under --dry-run without confirmation
+    severity: required
+    probe: destructive-dry-run-no-confirm
+  - id: dryrun.destructive-confirm-required
+    section: dry-run
+    title: A destructive command refuses to act without confirmation when non-interactive
+    severity: required
+    probe: destructive-requires-confirm
+
+  # Determinism
+  - id: determinism.repeatable
+    section: determinism
+    title: Two identical --json runs are byte-identical
+    severity: required
+    probe: repeatable-output
+  - id: determinism.stable-sort
+    section: determinism
+    title: A list command keeps a stable order across runs
+    severity: recommended
+    probe: stable-sort
+
+  # Name resolution
+  - id: resolution.no-prompt
+    section: name-resolution
+    title: An ambiguous name with --no-prompt fails without blocking
+    severity: required
+    probe: ambiguous-name-no-prompt
+
+  # Self-describing help
+  - id: help.examples
+    section: self-describing-help
+    title: A command's --help contains an examples section
+    severity: required
+    probe: help-has-examples
+  - id: help.related
+    section: self-describing-help
+    title: A command's --help points to related commands
+    severity: recommended
+    probe: help-has-related
+
+  # Self-update
+  - id: update.check-readonly
+    section: self-update
+    title: update --check reports without changing the binary
+    severity: required
+    probe: update-check-readonly
+  - id: update.check-json
+    section: self-update
+    title: update --check --json emits valid JSON
+    severity: recommended
+    probe: update-check-json
+
+  # Auth and config
+  - id: auth.secret-not-printed
+    section: auth-and-config
+    title: A credential value is never printed
+    severity: required
+    probe: secret-not-printed
+  - id: auth.config-flag
+    section: auth-and-config
+    title: A read command honors --config
+    severity: recommended
+    probe: config-flag-override

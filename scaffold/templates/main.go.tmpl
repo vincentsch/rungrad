@@ -1,0 +1,142 @@
+// Command {{.Name}} is a CLI built on the rungrad framework.
+package main
+
+import (
+	"io"
+	"os"
+	"sort"
+
+	"github.com/spf13/cobra"
+	rungrad "github.com/vincentsch/rungrad"
+	"github.com/vincentsch/rungrad/output"
+	"github.com/vincentsch/rungrad/update"
+)
+
+// version is the single source of truth for the build version, the update
+// command's current version, and the offline fetcher's reported release.
+const version = "v0.1.0"
+
+type widget struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+var widgets = []widget{ {ID: "1", Name: "alpha"}, {ID: "2", Name: "beta"} }
+
+// sortedWidgets copies before sorting so list output is stable without mutating
+// the shared fixture used by in-process tests.
+func sortedWidgets() []widget {
+	out := append([]widget(nil), widgets...)
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
+}
+
+// fixedFetcher reports a single release without contacting the network, so the
+// generated `update --check` is deterministic and offline. Replace it with
+// update.GitHubFetcher (or equivalent release wiring) before distributing real
+// releases.
+type fixedFetcher struct{ version string }
+
+func (f fixedFetcher) Latest() (update.Release, error) {
+	return update.Release{Version: f.version}, nil
+}
+
+func newApp() *rungrad.App {
+	app := rungrad.New(rungrad.AppConfig{
+		Name:    "{{.Name}}",
+		Short:   "{{.Name}} CLI",
+		Long:    "{{.Name}} is a starter CLI built on the rungrad framework.",
+		Version: version,
+		EnvVar:  "{{.EnvVar}}",
+	})
+	// Keep root related-command text as help prose only. The manifest root entry
+	// should have related: [] because it has no command annotation.
+	app.Root().Example = "{{.Name}} widget list\n{{.Name}} widget list --json\n{{.Name}} widget create gamma --dry-run"
+	app.Root().Long += "\n\nRelated commands:\n  {{.Name}} widget list\n  {{.Name}} update"
+
+	widgetCmd := &rungrad.Command{Use: "widget", Short: "Work with widgets"}
+	widgetCmd.AddCommand(
+		&rungrad.Command{
+			Use:         "list",
+			Short:       "List widgets",
+			Examples:    []string{"{{.Name}} widget list", "{{.Name}} widget list --json"},
+			Related:     []string{"{{.Name}} widget create"},
+			OutputModes: []string{"table", "json"},
+			Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+				data := sortedWidgets()
+				return f.WriteResult(data, func(w io.Writer) {
+					rows := make([][]string, 0, len(data))
+					for _, it := range data {
+						rows = append(rows, []string{it.ID, it.Name})
+					}
+					output.RenderTable(w, output.Table{Columns: []string{"ID", "Name"}, Rows: rows, Empty: "No widgets."})
+				})
+			},
+		},
+		&rungrad.Command{
+			Use:         "create <name>",
+			Short:       "Create a widget",
+			Examples:    []string{"{{.Name}} widget create gamma", "{{.Name}} widget create gamma --dry-run"},
+			Related:     []string{"{{.Name}} widget list"},
+			OutputModes: []string{"table", "json"},
+			Mutates:     true,
+			Args:        cobra.ExactArgs(1),
+			Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+				summary := output.MutationSummary{Action: "Created", Resource: "widget", Name: args[0]}
+				if f.DryRun() {
+					return f.WritePreview(output.DryRunPreview{
+						Method: "POST", Path: "/widgets",
+						Body: []output.Field{
+							{Name: "name", Value: args[0]},
+							// A masked secret field shows how dry-run previews hide credentials.
+							{Name: "token", Value: "scaffold-secret", Secret: true},
+						},
+					})
+				}
+				return f.WriteResult(summary, func(w io.Writer) { output.RenderMutation(w, summary) })
+			},
+		},
+		&rungrad.Command{
+			Use:         "delete <name>",
+			Short:       "Delete a widget",
+			Examples:    []string{"{{.Name}} widget delete alpha --dry-run", "{{.Name}} widget delete alpha --confirm"},
+			Related:     []string{"{{.Name}} widget list"},
+			OutputModes: []string{"table", "json"},
+			Destructive: true, // implies Mutates: the command honors --dry-run
+			Args:        cobra.ExactArgs(1),
+			Configure: func(cmd *cobra.Command) {
+				cmd.Flags().Bool("confirm", false, "Confirm the destructive action without a prompt")
+			},
+			Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+				// Operate on the supplied name directly; a starter does not need name
+				// resolution to demonstrate destructive confirmation.
+				if f.DryRun() {
+					return f.WritePreview(output.DryRunPreview{Method: "DELETE", Path: "/widgets/" + args[0]})
+				}
+				confirmed, _ := cmd.Flags().GetBool("confirm")
+				if err := f.ConfirmDestructive(rungrad.ConfirmOptions{
+					Action:    "delete widget",
+					Target:    args[0],
+					Confirmed: confirmed,
+				}); err != nil {
+					return err
+				}
+				// Offline starter: report the deletion without mutating the in-memory
+				// widgets slice, so repeated runs and tests stay deterministic.
+				summary := output.MutationSummary{Action: "Deleted", Resource: "widget", Name: args[0]}
+				return f.WriteResult(summary, func(w io.Writer) { output.RenderMutation(w, summary) })
+			},
+		},
+	)
+
+	app.AddCommand(widgetCmd, update.Command(update.CommandConfig{
+		CurrentVersion: version,
+		Fetcher:        fixedFetcher{version: version},
+		ToolName:       "{{.Name}}",
+	}))
+	return app
+}
+
+func main() {
+	os.Exit(newApp().Run(os.Args[1:], os.Stdout, os.Stderr))
+}

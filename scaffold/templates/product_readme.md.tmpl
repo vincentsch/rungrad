@@ -1,0 +1,61 @@
+# {{.DocsLabel}}
+
+{{.ProductName}} is a command-line tool built on
+[rungrad](https://github.com/vincentsch/rungrad), so it speaks the agent-ready
+CLI spec: stable `--json` output, `--dry-run` previews, destructive
+confirmation, deterministic results, self-describing help, and an
+offline-checkable self-update.
+
+## Build and run
+
+```bash
+go mod tidy
+go build -o {{.Name}} .
+./{{.Name}} widget list
+./{{.Name}} widget list --json
+./{{.Name}} widget create gamma --dry-run
+./{{.Name}} widget delete alpha --dry-run
+./{{.Name}} update --check
+```
+
+If you want to develop against a local rungrad checkout instead of the tagged
+module version, add a local replace:
+
+```bash
+go mod edit -replace github.com/vincentsch/rungrad=/path/to/rungrad
+go mod tidy
+```
+
+## Configure endpoints
+
+The scaffold resolves service endpoints from flags, environment variables,
+profile config, global config, and the built-in defaults below.
+
+| Service | Flag | Environment | Config key | Default |
+| --- | --- | --- | --- | --- |
+{{range .Services}}| `{{.Name}}` | `--{{.Flag}}` | `{{.EnvVar}}` | `{{.ConfigKey}}` | `{{.Default}}` |
+{{end}}
+Profile, auth-file, and config paths can be set with `{{.ProfileEnvVar}}`,
+`{{.AuthFileEnvVar}}`, and `{{.ConfigEnvVar}}`.
+
+## Score it against the spec
+
+```bash
+rungrad score ./{{.Name}} \
+  --read        "widget list" \
+  --mutate      "widget create demo" \
+  --destructive "widget delete alpha" \
+  --update
+```
+
+The product scaffold implements read output, a mutating dry-run, a safe
+destructive command, endpoint resolution, manifest metadata, and an offline
+update, so those rules score. It intentionally omits the auth,
+name-resolution, missing-resource, backend-error, forbidden, rate-limit, and
+credential-secret fixtures, which the scorer reports as not-applicable rather
+than failures.
+
+> The generated `update` command uses an offline fixed fetcher so the project can
+> be scored locally without network access. Before distributing real releases,
+> replace it with `update.GitHubFetcher{Owner: "{{.ReleaseOwner}}", Repo:
+> "{{.ReleaseRepo}}"}` or equivalent release wiring.
