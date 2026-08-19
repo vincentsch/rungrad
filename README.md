@@ -1,7 +1,11 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/rungrad-logo-dark.svg">
-  <img src="docs/assets/rungrad-logo.svg" alt="rungrad" width="300">
-</picture>
+<p>
+  <a href="https://www.rungrad.com">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/rungrad-logo-dark.svg">
+      <img src="docs/assets/rungrad-logo.svg" alt="rungrad" width="300">
+    </picture>
+  </a>
+</p>
 
 rungrad is a Go framework for CLIs used in terminals, scripts, and CI. Each
 command has text output for people, stable `--json` for programs, `--dry-run`
