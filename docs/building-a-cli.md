@@ -661,10 +661,10 @@ only `Credential.Token` for redaction. Any secret material placed in
 `Credential.Extra` or discovered elsewhere must be registered through
 `AuthContext.RegisterSecret`.
 
-Returning `config.ErrMissingCredential` exits 3. Returning `config.Error` exits
-1. Returning a `rungrad.Error` or any error with `ExitCode() int` uses that code;
-other errors exit 2. The default resolver reports malformed or unreadable local
-credential files as structured config errors, so they exit 1.
+Returning `config.ErrMissingCredential` exits 3. Returning `config.Error`
+exits 1. Returning a `rungrad.Error` or any error with `ExitCode() int` uses
+that code; other errors exit 2. The default resolver reports malformed or
+unreadable local credential files as structured config errors, so they exit 1.
 
 ### Browser login
 
