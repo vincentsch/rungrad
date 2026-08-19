@@ -21,6 +21,12 @@ The repo contains three parts:
 The spec stands on its own: a CLI written in any language can follow it and be
 checked with `rungrad score`.
 
+## CLIs Built on rungrad
+
+- [asana-cli](https://github.com/vincentsch/asana-cli): an unofficial Asana CLI
+  with stable output, dry-run previews, destructive confirmations, and rungrad
+  conformance.
+
 ## Install
 
 Requires Go 1.22.2 or newer.
