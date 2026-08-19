@@ -1,8 +1,8 @@
 # Config and auth reference
 
-rungrad owns the generic resolution shape for profiles, config paths, auth-file
+rungrad handles the resolution shape for profiles, config paths, auth-file
 paths, services, credential hooks, browser helpers, redaction of the primary
-token, and exit-code mapping. Product CLIs own their file formats, login
+token, and exit-code mapping. Product CLIs handle file formats, login
 protocols, URL derivation, and API validation.
 
 ## Precedence
@@ -48,8 +48,8 @@ For example, `my-tool` uses `MY_TOOL_CONFIG`, `MY_TOOL_PROFILE`, and
 
 Default non-secret config is YAML at `config.yaml` and is written `0644`.
 Credentials are stored separately as JSON at `credentials.json` and written
-`0600`. Both writes are atomic. `Store.Credentials` can point credentials at an
-explicit auth file without changing `Store.Override` or the config path.
+`0600`. Both writes are atomic. Set `Store.Credentials` to point credentials at
+an explicit auth file without changing `Store.Override` or the config path.
 
 Service config lookup checks `Profile.BaseURL` for `base_url`, then
 `Profile.Services[key]`, then `Profile.Defaults[key]`; global lookup checks
@@ -60,9 +60,9 @@ Service config lookup checks `Profile.BaseURL` for `base_url`, then
 Use `ResolutionConfig.LoadConfig` to normalize adopter-owned config formats into
 `config.Config` before generic resolution runs. A missing file is not an error.
 
-Use `AppConfig.Auth` to provide a `CredentialResolver`. It receives
-`AuthContext`, can read `AuthContext.Service(name)`, and can register additional
-secret values with `AuthContext.RegisterSecret`.
+Use `AppConfig.Auth` to provide a `CredentialResolver`. The resolver receives
+`AuthContext`; use `AuthContext.Service(name)` for service endpoints and
+`AuthContext.RegisterSecret` for additional secret values.
 
 The default resolver preserves the compact behavior: credential env var, then
 stored credential for the resolved profile, then `config.ErrMissingCredential`.
@@ -72,7 +72,7 @@ opening. Use `browser.LoginFlow` for the open-then-poll loop.
 
 ## Adopter responsibilities
 
-Adopters own product config and auth-file formats, browser/device-login
+Adopters handle product config and auth-file formats, browser/device-login
 protocols, endpoint derivation, API validation, workspace or tenant semantics,
 and registering any secret beyond `Credential.Token`.
 

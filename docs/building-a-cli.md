@@ -1,27 +1,20 @@
 # Building a CLI with rungrad
 
-This guide shows how to build a command-line tool on the rungrad framework. A
-rungrad tool gets the agent-ready behaviors of the spec by default: stable dual
-output, dry-run previews, deterministic results, name resolution, self-describing
-help, self-update, and a stable exit-code contract.
+Start with `rungrad new mytool` (see [Getting started](getting-started.md)). This
+guide explains the generated code and the APIs used to turn the starter into
+your own tool. Your command does the work. rungrad handles text and JSON output,
+dry-run previews, confirmation before destructive actions, exit codes, help,
+generated docs, the hidden manifest, and scoring.
 
-The fastest start is `rungrad new mytool` (see [Getting started](getting-started.md)).
-This guide explains what the generated code does and how to go further.
+rungrad handles output modes, terminal and pager controls, redaction, feature
+modules, catalog validation, docs/help checks, manifest output,
+config/auth/service hooks, browser-opening helpers, test helpers, and scoring.
+Your CLI owns API calls, command behavior, service URLs, login flow, workspace
+rules, and extra secret values unless it registers them with rungrad.
 
-rungrad owns the generic CLI mechanics: output modes, metadata envelopes,
-terminal and pager controls, framework-owned redaction boundaries, feature
-modules, catalog validation, docs and help gates, manifest emission,
-config/auth/service resolution hooks, browser-opening helpers, testutil helpers,
-and conformance scoring. Product CLIs own their API protocols, domain command
-behavior, endpoint schemas, tenant or workspace semantics, login and device
-protocols, URL derivation, and any secret material outside the primary
-credential token unless they register it with rungrad.
-
-Migrating an existing Cobra CLI onto rungrad is adopter work in that tool's own
-repository. Follow the ordered path in
-[Migrating from Cobra](migrating-from-cobra.md), which maps former bridge
-workarounds to the Project 12 APIs that retired them, while this guide remains
-the API reference for building each surface.
+To port an existing Cobra CLI, follow the ordered path in
+[Migrating from Cobra](migrating-from-cobra.md). This guide documents the APIs
+used there.
 
 ## The App
 
@@ -52,7 +45,7 @@ auth-file, and service-endpoint globals. The reference CLI opts into advanced
 output and resolution in
 [`cmd/rgref/main.go`](../cmd/rgref/main.go).
 
-Existing product CLIs can customize those public framework surfaces through
+Existing product CLIs customize those public framework surfaces through
 `AppConfig.Surface`; see [Framework surface customization](#framework-surface-customization).
 `Run` executes the tool, prints any error in the active output mode, and returns
 the classified process exit code. `RunIO` is the same with an explicit input
@@ -83,7 +76,7 @@ Fields:
 - `OutputModes` documents the supported forms for docs and conformance.
 - `Mutates: true` marks a state-changing command that should honor `--dry-run`.
 - `Destructive: true` marks a destructive command. It implies `Mutates` and is
-  expected to gate the real action behind `f.ConfirmDestructive` (see Dry run).
+  expected to gate the action behind `f.ConfirmDestructive` (see Dry run).
 - `RequiresAuth: true` makes the validate-then-auth pre-run hook load a credential
   before the command runs, failing with the auth exit code when none is available.
 - `Extensions` attaches product-owned command metadata to the manifest under
@@ -97,7 +90,7 @@ Use `cmd.AddCommand(sub...)` to build a parent command with subcommands.
 
 ## Feature modules and command catalog
 
-Large CLIs can split commands across compiled-in feature modules. A module is an
+A large CLI can split commands across compiled-in feature modules. A module is an
 ordinary Go value registered explicitly at startup. It implements the
 `rungrad.FeatureModule` interface:
 
@@ -109,7 +102,7 @@ type FeatureModule interface {
 }
 ```
 
-A small module looks like this:
+A module looks like this:
 
 ```go
 type WidgetModule struct{}
@@ -138,8 +131,8 @@ app.AddModule(WidgetModule{})
 ```
 
 `App.AddModule` registers module groups through the same path as `App.AddGroup`,
-then registers the module's top-level commands through `App.AddCommand`, and
-then stores a deep copy of the module catalog. Re-registering the same help group
+registers the module's top-level commands through `App.AddCommand`, and stores a
+deep copy of the module catalog. Re-registering the same help group
 `ID` with the same title is ignored so modules can share groups. Reusing a group
 `ID` with a different title panics. `help` is always a reserved command name.
 `completion` is reserved unless `AppConfig.Surface.Completion` is host-owned.
@@ -153,7 +146,7 @@ docs-facing command contract, including `Path`, `Summary`, `GroupID`,
 `OutputModes`, `Examples`, `Related`, `RequiresAuth`, `Mutates`, `Destructive`,
 `SupportsMeta`, and `Extensions`. `CommandSpec.Extensions` mirrors
 `Command.Extensions`; `ValidateCatalog` canonical-encodes both sides and reports
-drift when product metadata no longer matches the built command. Call
+drift when product metadata no longer matches the built command. Use
 `testutil.AssertConsistent` from a unit test to catch catalog, help, docs, and
 manifest drift:
 
@@ -192,9 +185,9 @@ and registered explicitly; rungrad never discovers or loads modules at runtime.
 
 ## Framework surface customization
 
-`AppConfig.Surface` lets an adopter decide which public surfaces rungrad owns,
-which the host owns, and which are disabled. The zero value preserves the
-default rungrad-owned behavior.
+`AppConfig.Surface` controls which public surfaces rungrad owns, which the host
+owns, and which are disabled. The zero value preserves the default rungrad-owned
+behavior.
 
 `SurfaceMode` has three values:
 
@@ -204,7 +197,7 @@ default rungrad-owned behavior.
 - `SurfaceDisabled` (`"disabled"`) omits that surface.
 
 Global flags are all-or-nothing through `Surface.GlobalFlags`. In
-rungrad-owned mode, rungrad registers its normal flags. In disabled mode, it
+rungrad-owned mode, rungrad registers its flags. In disabled mode, it
 registers none of them; product-local flags named `--json`, `--jq`, or
 `--template` do not trigger rungrad machine-mode error rendering. In host-owned
 mode, provide a `GlobalFlagBindings` entry for every rungrad-recognized flag
@@ -215,7 +208,7 @@ Bindings for `json`, `jq`, and `template` cannot define shorthands because the
 early raw-argument machine detector tracks long names only. Hidden host bindings
 work at runtime but are omitted from the manifest and generated docs.
 
-Advanced embedders can call `app.BindGlobalFlags(fs, bindings)` to register the
+Advanced embedders call `app.BindGlobalFlags(fs, bindings)` to register the
 same host-owned binding logic on a chosen `*pflag.FlagSet`. `New` calls this
 automatically when `Surface.GlobalFlags.Mode` is `SurfaceHostOwned`; malformed
 binding sets return an error from `BindGlobalFlags` and panic from `New`.
@@ -246,7 +239,7 @@ typed manifest, and a staged stdout writer. If the renderer returns an error,
 staged bytes are discarded and rungrad reports the error; there is no fallback
 to the default manifest bytes.
 
-Call `app.ManifestDocument()` when you need the typed `manifest.Manifest`
+Call `app.ManifestDocument()` for the typed `manifest.Manifest`
 document directly from a framework-built tree. If you are inspecting or mutating
 raw Cobra annotations manually, call `app.ManifestDocumentChecked()` so malformed
 `rungrad.extensions` annotation JSON is returned as an error instead of treated
@@ -254,11 +247,12 @@ as a programmer panic. The default hidden endpoint and host-rendered endpoints
 use the checked builder before rendering.
 
 The conformance scorer discovers only the default `__rungrad_manifest` endpoint.
-Rungrad-owned and host-rendered default endpoints can be manifest-backed during
-`rungrad score`. Disabled or renamed endpoints are valid customized framework
-surfaces, but scoring treats them as black-box targets in `--manifest auto` or
-when the caller explicitly uses `--manifest off`; `--manifest required` fails
-when the default endpoint is absent.
+Under `--manifest auto` or `--manifest required`, scoring uses rungrad-owned and
+host-rendered default endpoints when discovery succeeds. Disabled or renamed
+endpoints are valid customized framework surfaces, but scoring treats them as
+black-box targets in `--manifest auto` or when the caller explicitly uses
+`--manifest off`; `--manifest required` fails when the default endpoint is
+absent.
 
 ## Output: one model, two forms
 
@@ -277,8 +271,8 @@ func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
 ```
 
 `WriteResult(model, human)` emits `output.StableJSON(model)` under `--json`,
-otherwise it calls the human renderer. Because both come from one call, the human
-and machine forms cannot drift. The `output` package also provides `Node` (for
+otherwise it calls the human renderer. Because both come from one call, the text
+and machine forms stay aligned. The `output` package also provides `Node` (for
 key/value detail views) and `MutationSummary` (for create/update/delete results),
 plus `RenderNodes`, `RenderTable`, and `RenderMutation`.
 
@@ -301,12 +295,12 @@ These color only the mutation action word and the `DRY RUN` label respectively,
 and only when the `output.TerminalMode` has both `ANSI` and `Color` set. The plain
 `RenderMutation` and `Render` helpers are the same renderers with a zero
 `TerminalMode`. `Factory.TerminalMode()` enables styling only for human output to
-a real stdout terminal. JSON, jq, template, explicit plain output, piped output,
+a stdout terminal. JSON, jq, template, explicit plain output, piped output,
 and ordinary test output stay escape-free. `WritePreview` already renders
 previews through `RenderMode(f.Stdout, f.TerminalMode())`, while
 mutation-summary color is opt-in by rendering with `RenderMutationMode`.
 
-In advanced-output apps, users can refine terminal behavior without changing
+In advanced-output apps, users refine terminal behavior without changing
 command code. `--no-color` disables color while leaving non-color ANSI available.
 `--no-ansi` disables all terminal control bytes in human output and disables the
 pager. `--no-pager` disables pager use only. Human output to non-terminal stdout
@@ -423,8 +417,7 @@ pin the global terminal and pager flags.
 
 ## Metadata envelope (--include-meta)
 
-Advanced-output apps can expose request metadata in machine output. Declare the
-capability per command:
+To expose request metadata in machine output, declare the capability per command:
 
 ```go
 &rungrad.Command{
@@ -446,7 +439,7 @@ capability per command:
 Build `output.Meta` from the response information your API reports. Keep secrets
 out of metadata because it is emitted verbatim. Use `RequestID` for the primary
 request and `RequestIDs` when retries, redirects, or upstream services return
-more than one useful request id:
+more than one request id:
 
 ```go
 func metaFromResponse(resp *http.Response, page PageInfo, attempts int, waits []int64) output.Meta {
@@ -484,7 +477,7 @@ metadata is attached, `--include-meta` still yields a deterministic `{"data":
 
 When a command also declares `plain`, use `WriteOutput` and set `Output.Meta`.
 Human output and `--plain` are never wrapped; a command may still render captured
-metadata in its own human view if that is useful.
+metadata in its human view.
 
 The reference command is `rgref item list`: it sets `SupportsMeta`, attaches
 `Output.Meta`, and makes the envelope visible to
@@ -526,7 +519,7 @@ label; under `--json` or when piped the preview is plain. Without `--dry-run`,
 perform the write and return a `MutationSummary` through `WriteResult`.
 
 For destructive actions, mark the command `Destructive: true`, register a local
-`--confirm` flag through `Configure`, and gate the real action behind
+`--confirm` flag through `Configure`, and gate the action behind
 `f.ConfirmDestructive`:
 
 ```go
@@ -588,8 +581,8 @@ precedence, stored in a separate `0600` file, and masked for display with
 
 ### Profiles, paths, and service endpoints
 
-Apps that need product-style profile, auth-file, or endpoint resolution can opt
-in with `AppConfig.Resolution`:
+To use product-style profile, auth-file, or endpoint resolution, set
+`AppConfig.Resolution`:
 
 ```go
 app := rungrad.New(rungrad.AppConfig{
@@ -647,10 +640,10 @@ resolver.
 
 ### Config loading
 
-The default loader reads rungrad's `config.yaml` into `config.Config`. Adapters
-with product-owned config formats can set `ResolutionConfig.LoadConfig` to read
-their file and normalize it into `config.Config` before generic profile and
-service precedence runs. Missing config files are treated as an empty
+The default loader reads rungrad's `config.yaml` into `config.Config`. For
+product-owned config formats, set `ResolutionConfig.LoadConfig` to read the file
+and normalize it into `config.Config` before generic profile and service
+precedence runs. Missing config files are treated as an empty
 `Config{Version: 1}`.
 
 ### Custom credential resolution
@@ -676,7 +669,7 @@ credential files as structured config errors, so they exit 1.
 ### Browser login
 
 Use `f.OpenBrowser(ctx, url)` to open the user's browser. It calls the injected
-`Factory.BrowserOpener` when set, otherwise `browser.Open`. Tests can inject the
+`Factory.BrowserOpener` when set, otherwise `browser.Open`. Tests inject the
 same hook through `testutil.Options.BrowserOpener`.
 
 The `browser.LoginFlow` helper owns the generic open-then-poll loop: it opens
@@ -697,7 +690,7 @@ loop and cancellation behavior. `TestBrowserOpenerInjection` in
 `TestCustomCredentialResolverAndRedaction` in the same file proves that a custom
 `CredentialResolver` can register an extra secret through
 `AuthContext.RegisterSecret` and have it redacted at output boundaries, which is
-the behavior a real browser or device login relies on after it captures a token.
+the behavior a browser or device login relies on after it captures a token.
 
 ### Structured config errors
 
@@ -756,10 +749,10 @@ framework boundary coverage lives in [`redaction_test.go`](../redaction_test.go)
 
 Use `f.Infof` for non-essential progress or hints on stderr. It is suppressed
 under `--quiet` and machine output (`--json`, `--jq`, or `--template`), so a
-successful machine-readable run carries no human-only guidance on stderr. Do not
-put primary command results behind `Infof`; those should still go through
+successful machine-output run carries no human-only guidance on stderr. Do not
+put primary command results behind `Infof`; route those through
 `WriteResult` or `WritePreview`. Destructive prompts and JSON error bodies do not
-go through `Infof`, so `--quiet` cannot hide a required prompt or a real error.
+go through `Infof`, so `--quiet` cannot hide a required prompt or error.
 
 ## Self-update
 
@@ -815,10 +808,10 @@ not 3 (auth).
 
 ### Host-owned error rendering and exit codes
 
-New CLIs should normally use rungrad's default error text, JSON envelope, and
-exit-code mapping. When porting an established Cobra CLI with a public error
-contract, set `AppConfig.ErrorPolicy` so the host can preserve its own stderr
-shape and product-specific exit categories without filtering rungrad output.
+Use rungrad's default error text, JSON envelope, and exit-code mapping for new
+CLIs. When porting an established Cobra CLI with a public error contract, set
+`AppConfig.ErrorPolicy` so the host preserves its stderr shape and
+product-specific exit categories without filtering rungrad output.
 
 `ErrorPolicy.Classify` receives an `ErrorContext` with `DefaultExitCode`, the
 underlying `Err`, the resolved command path when Cobra found one, raw args, the
@@ -879,7 +872,7 @@ app := rungrad.New(rungrad.AppConfig{
 })
 ```
 
-## Testing (dogfood)
+## Testing
 
 Run your own commands in-process and assert on the captured output:
 
@@ -890,7 +883,7 @@ if res.Exit != rungrad.ExitSuccess { t.Fatal(res.Stderr) }
 
 `testutil.Run`/`RunWith` capture stdout, stderr, and the classified exit code;
 `testutil.MockServer` stands up an `httptest` server for an API client. Because
-output is deterministic, tests can pin it exactly.
+output is deterministic, tests pin it exactly.
 
 ## Help goldens, docs sync, and consistency
 
@@ -934,7 +927,7 @@ exact `--help` bytes checked by `TestHelpGoldensInSync`.
 docs, help, manifest metadata, and catalog rows agree on one visible command
 surface.
 
-The reference CLI dogfoods all three in
+The reference CLI exercises all three in
 [`cmd/rgref/docs_test.go`](../cmd/rgref/docs_test.go) and
 [`cmd/rgref/catalog_test.go`](../cmd/rgref/catalog_test.go); committed docs live
 under [`cmd/rgref/docs/`](../cmd/rgref/docs/), and exact help goldens live under
@@ -946,14 +939,14 @@ flag regenerates docs and help goldens together.
 By default, apps built with `rungrad.New` expose `__rungrad_manifest`
 automatically. The hidden command emits deterministic JSON generated from the
 same command tree and metadata used by help and docs generation, without loading
-credentials or running adopter handlers. `AppConfig.Surface.Manifest` can
+credentials or running adopter handlers. Use `AppConfig.Surface.Manifest` to
 disable, rename, or host-render that endpoint. See [The rungrad manifest](manifest.md)
 for the protocol and schema. The reference manifest metadata and global flags
 are pinned by `TestManifestReferenceCommands`, `TestManifestReferenceOutputModes`,
 and `TestManifestGlobalFlagsIncludeAdvanced` in
 [`cmd/rgref/manifest_test.go`](../cmd/rgref/manifest_test.go).
 
-For product-owned metadata that should appear in the machine manifest but is not
+For product-owned metadata that needs to appear in the machine manifest but is not
 part of rungrad's core command contract, set `Command.Extensions`:
 
 ```go
@@ -985,13 +978,13 @@ fields. Generic manifest consumers tolerate valid unknown namespaces.
 
 ## Starting from the scaffold
 
-Use `rungrad new <name>` for a fresh compact starter. It gives you a small
-widget resource, dual human/JSON output, mutating dry-run behavior, destructive
-confirmation, an offline update command, generated tests, and a README without
-making product-level choices for you.
+Use `rungrad new <name>` for the compact widget starter. It includes a widget
+resource, text/JSON output, mutating dry-run behavior, destructive confirmation,
+an offline update command, generated tests, and a README without making
+product-level choices.
 
-Use `rungrad new <name> --product-profile` when the new CLI should already look
-like a product: custom env-var prefix, profile/auth-file/config resolution,
+Use `rungrad new <name> --product-profile` for a product-shaped CLI: custom
+env-var prefix, profile/auth-file/config resolution,
 service endpoint flags/env/config keys, product labels, a manifest extension
 namespace, and a choice of global-flag ownership through `AppConfig.Surface`.
 The product scaffold also demonstrates `manifest.ExtensionSet` on a command and
@@ -1008,6 +1001,6 @@ update wiring. There is no automated rename, migration, or porting command.
 
 Build your binary and run `rungrad score` against it (see
 [Conformance and the spec](conformance.md)). A tool built with this guide should
-score 100% on the rules that apply to it. The dogfood proof for the reference
-surface is `TestReferenceCLIScoresPerfect` in
-[`cmd/rgref/conformance_test.go`](../cmd/rgref/conformance_test.go).
+score 100% on the rules that apply to it. `TestReferenceCLIScoresPerfect` in
+[`cmd/rgref/conformance_test.go`](../cmd/rgref/conformance_test.go) pins this
+for the reference CLI.

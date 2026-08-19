@@ -2,16 +2,14 @@
 
 ## Criterion
 
-A tool produces a human-readable view by default and a stable machine view on
-request. The machine view is selected with `--json` and is the same data the
-human view is built from.
+A tool produces text by default and a JSON view on request. `--json` selects the
+JSON view, which uses the same data as the text view.
 
 ## Rationale
 
-An automated caller cannot reliably scrape aligned columns or prose. It needs a
-parseable structure with stable field names. Building both views from one model
-keeps them from drifting, so what a human sees and what a script parses describe
-the same result.
+A script cannot parse aligned columns or prose without brittle rules. It needs
+JSON with stable field names. Building both views from one model keeps them
+aligned: what a person sees and what a script reads describe the same result.
 
 ## Testable assertions
 

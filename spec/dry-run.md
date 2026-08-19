@@ -8,11 +8,10 @@ what it would do without performing the change.
 ## Rationale
 
 An agent or operator needs to preview a destructive or expensive action before
-committing to it. A dependable dry run turns "I think this is right" into "I can
-see what this will do," and lets automation gate on the preview. For destructive
-actions the same safety extends past the preview: the tool performs the change
-only after explicit confirmation, and refuses rather than blocks when
-confirmation cannot be obtained non-interactively.
+committing to it. A dry run shows the planned change and lets automation gate on
+the preview. For destructive actions, the tool performs the change only after
+explicit confirmation, and refuses instead of blocking when confirmation is not
+available non-interactively.
 
 ## Testable assertions
 

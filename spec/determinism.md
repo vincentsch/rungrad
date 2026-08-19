@@ -8,9 +8,9 @@ identifiers in default output.
 
 ## Rationale
 
-Determinism is what makes output diffable and cacheable. An agent that compares
-two runs, or a CI job that snapshots output, depends on the same result encoding
-the same way every time.
+Determinism keeps output comparable and cacheable. An agent that compares two
+runs, or a CI job that snapshots output, depends on the same result encoded the
+same way every time.
 
 ## Testable assertions
 

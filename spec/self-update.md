@@ -2,14 +2,13 @@
 
 ## Criterion
 
-A tool can report whether a newer version is available without changing anything,
-and that check has a machine-readable form.
+A tool reports whether a newer version is available without changing anything,
+and that check has a JSON form.
 
 ## Rationale
 
-Agents and CI should be able to ask "is this current?" as a safe, read-only
-question, separate from the act of installing. A JSON form lets automation gate
-on the answer.
+Agents and CI need a read-only answer to "is this current?" separate from
+installing a release. A JSON form lets automation gate on the answer.
 
 ## Testable assertions
 

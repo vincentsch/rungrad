@@ -2,8 +2,8 @@
 
 ## Criterion
 
-A tool returns a small, stable set of exit codes that classify the outcome, so a
-caller can branch on the result without parsing text.
+A tool returns a stable set of exit codes that classify the outcome, so callers
+branch on the result without parsing text.
 
 ## Rationale
 

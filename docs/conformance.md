@@ -1,9 +1,8 @@
 # Conformance and the spec
 
-rungrad turns "agent-ready" from a claim into something you can measure. The spec
-is a short, versioned, language-neutral checklist of the properties that make a
-CLI safe and legible for an automated caller. The scorer drives any CLI and
-reports how it does against that spec.
+rungrad checks whether a CLI follows the agent-ready spec. The spec is a
+checklist for CLIs used in a terminal, scripts, and CI. The scorer runs any CLI
+and reports how it does against that checklist.
 
 ## The spec
 
@@ -13,7 +12,7 @@ The written specification lives in [`../spec/`](../spec/README.md), version
 | Section | What it requires |
 | --- | --- |
 | Output contract | Human view by default, stable `--json` from the same model |
-| Exit-code model | A small, stable set of exit codes (0–6) |
+| Exit-code model | A stable set of exit codes (0-6) |
 | Dry run | Mutating commands preview under `--dry-run` without acting |
 | Determinism | Same input, same output; no incidental noise |
 | Name resolution | Names accepted; ambiguous names never block under `--no-prompt` |
@@ -26,8 +25,8 @@ Each section lists testable assertions. Every assertion is encoded as a rule in
 (`required` or `recommended`), and a probe name. The prose and the ruleset are kept
 in step by a test in the `conformance` package.
 
-The spec stands on its own. A tool in any language can conform to it; the Go
-framework is just one implementation that provides the behaviors by default.
+The spec stands on its own. A tool in any language can follow it; the Go
+framework is one implementation.
 
 ## Machine manifest
 
@@ -35,7 +34,7 @@ Tools built with the Go framework expose `__rungrad_manifest` by default, a
 hidden command that emits deterministic JSON describing the command tree, flags,
 and rungrad metadata. It is a producer protocol for structured metadata: the
 command does not require `--json`, load credentials, or run adopter handlers.
-Adopters can customize that endpoint through `AppConfig.Surface.Manifest`: the
+Adopters customize that endpoint through `AppConfig.Surface.Manifest`: the
 default and host-rendered default endpoint are discoverable by the scorer, while
 disabled or renamed endpoints are valid customized surfaces that score through
 black-box probing. See [The rungrad manifest](manifest.md) for the schema and
@@ -43,7 +42,7 @@ emission contract.
 
 ### Manifest discovery during scoring
 
-`rungrad score` can discover that hidden endpoint before black-box probing:
+`--manifest` controls discovery of that hidden endpoint before black-box probing:
 
 | Mode | Behavior |
 | --- | --- |
@@ -127,8 +126,8 @@ Each flag names one of the target's commands that exercises a behavior:
 | `--update` | set when the target has an `update` command |
 | `--manifest auto\|off\|required` | control manifest discovery before black-box probing |
 
-A flag you do not provide makes its probes **not-applicable**, which neither helps
-nor hurts the score. The scorer runs the target as a subprocess in an isolated
+A flag you do not provide makes its probes **not-applicable**, which neither
+raises nor lowers the score. The scorer runs the target as a subprocess in an isolated
 config home with no credentials. Most probes use empty stdin, so prompts cannot
 hang the scorer; the destructive refusal probes instead use a blocking stdin pipe
 for bare no-terminal, `--no-prompt`, and `--json` runs so any attempted prompt or
@@ -136,9 +135,9 @@ stdin read is detected as a timeout. It does not sandbox the operating system
 network stack; target commands supplied to the scorer should be read-only,
 dry-run capable, or pointed at a safe stub backend.
 The destructive probes never pass `--confirm`, so the scorer never authorizes the
-real action; even so, black-box scoring cannot stop a broken target from acting,
-so the `--destructive` command must be a documented safe or stub command whose
-dry-run and refused-confirmation paths are safe to run repeatedly.
+action. Black-box scoring cannot stop a broken target from acting, so the
+`--destructive` command must be a documented stub or non-production command whose
+dry-run and refused-confirmation paths cause no harm when run repeatedly.
 
 ## Reading the result
 
@@ -152,8 +151,8 @@ the overall line also shows how many rules were applicable. Treat a high
 percentage with very few applicable rules as an incomplete measurement, not a
 badge-ready score.
 
-`--strict` makes `rungrad score` exit non-zero when any **required** rule fails, so
-you can gate a pull request on conformance:
+`--strict` makes `rungrad score` exit non-zero when any **required** rule fails,
+which lets CI gate a pull request on conformance:
 
 ```bash
 rungrad score ./mytool --read "widget list" --update --strict
@@ -161,12 +160,12 @@ rungrad score ./mytool --read "widget list" --update --strict
 
 Scoring weights required rules above recommended ones and excludes not-applicable
 rules from the denominator. A score always reports the spec version it was computed
-against, so it stays meaningful as a tool evolves.
+against, so the result stays comparable as a tool changes.
 A required rule reported not-applicable, for example the destructive rules when no
 `--destructive` fixture is configured, is excluded from the denominator and does
 not trip `--strict`; only a required rule that actually fails does.
 
-The `auth.config-flag` probe is intentionally black-box: it can verify that a read
+The `auth.config-flag` probe is intentionally black-box: it verifies that a read
 command accepts an isolated `--config` path and still succeeds, but it cannot prove
 that target-specific config values are semantically used unless the target exposes a
 read command whose output depends on config.

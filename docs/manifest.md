@@ -18,8 +18,8 @@ handlers. It is generated from the same command tree and annotations used by
 truth.
 
 `__rungrad_manifest` is reserved when rungrad registers the default endpoint:
-the rungrad-owned mode and the host-rendered default-endpoint mode. Adopters can
-use `AppConfig.Surface.Manifest` to disable the endpoint or rename it to a
+the rungrad-owned mode and the host-rendered default-endpoint mode. Adopters use
+`AppConfig.Surface.Manifest` to disable the endpoint or rename it to a
 different hidden command. In renamed mode, the renamed endpoint name is reserved
 instead and the default `__rungrad_manifest` name is not registered.
 
@@ -29,7 +29,7 @@ The manifest schema version is `rungrad-manifest/1`. It is separate from the
 scored CLI spec version, `rungrad-spec/1`.
 
 The top-level `spec_version` field is informational: it records which rungrad
-spec version the emitting framework was built against. Consumers should use
+spec version the emitting framework was built against. Consumers use
 `schema_version` to decide whether they understand the manifest's JSON shape.
 
 ## Manifest fields
@@ -60,9 +60,9 @@ Arrays are always JSON arrays. Empty arrays are emitted as `[]`, never `null`.
 | `supports_dry_run` | bool | Whether the rungrad-emitted manifest says the mutating command honors `--dry-run`. |
 | `destructive` | bool | Whether rungrad metadata marks the command as destructive. |
 | `requires_confirmation` | bool | Whether the command requires destructive confirmation before acting. |
-| `supports_meta` | bool | Whether the command can attach request metadata and so accepts `--include-meta`. |
+| `supports_meta` | bool | Whether the command supports request metadata and accepts `--include-meta`. |
 | `local_flags` | array of flag | Visible local flags, sorted by name, excluding global flags plus synthetic `help`; synthetic `version` is excluded only when Cobra `--version` is enabled. |
-| `extensions` | object | Product-owned namespaced metadata, keyed by `example.com/product`-style namespace. Omitted when no extensions are declared. Unknown namespaces are tolerated by generic consumers; values cannot reuse core command field names. |
+| `extensions` | object | Product-owned namespaced metadata, keyed by `example.com/product`-style namespace. Omitted when no extensions are declared. Generic consumers tolerate unknown namespaces; values cannot reuse core command field names. |
 
 The root command has `path: []`. Its `related` field is `[]` because root related
 commands are ordinary help prose, not command metadata. Its `local_flags` field
@@ -84,8 +84,8 @@ command field name such as `path`, `output_modes`, `supports_dry_run`,
 `supports_meta`, or `local_flags`.
 Duplicate object keys inside `extensions` are invalid.
 
-Generic consumers should ignore unknown valid namespaces. Products own the
-meaning of their own fields and can validate product invariants in tests. JSON
+Generic consumers ignore unknown valid namespaces. Products own the meaning of
+their own fields and validate product invariants in tests. JSON
 ordering is deterministic because manifest emission uses stable JSON with sorted
 map keys. A malformed extension makes the whole manifest invalid for discovery.
 
@@ -141,5 +141,5 @@ $ rgref __rungrad_manifest
 }
 ```
 
-The example is shortened; real rungrad tools include every visible global flag
+The example is shortened; rungrad tools include every visible global flag
 and every visible non-synthetic command.

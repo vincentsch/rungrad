@@ -23,7 +23,7 @@ go get github.com/vincentsch/rungrad@v0.2.1
 rungrad new mytool
 cd mytool
 go mod tidy
-go test ./...        # the generated tool's own tests pass immediately
+go test ./...        # the generated tool's tests pass
 go run . widget list
 go run . widget list --json
 go run . widget create gamma --dry-run
@@ -31,12 +31,12 @@ go run . widget delete alpha --dry-run
 go run . update --check
 ```
 
-`rungrad new` writes a complete project: `go.mod`, `main.go`, a `widget`
+`rungrad new` writes a project: `go.mod`, `main.go`, a `widget`
 resource, tests, a manifest endpoint, and a README. The generated commands show
 JSON output, dry-run previews, destructive-action confirmation, and an offline
 `update` command.
 
-Useful flags:
+Scaffold flags:
 
 - `--module` sets the Go module path.
 - `--dir` chooses the parent directory.
@@ -75,9 +75,9 @@ rungrad score ./mytool \
   --update
 ```
 
-You get a per-section report and an overall score. If the target exposes a valid
+The output is a per-section report and an overall score. If the target exposes a valid
 manifest, the scorer also checks fixture paths and command metadata. Add `--json`
-for a machine-readable score and `--strict` to fail CI when a required rule
+for a JSON score and `--strict` to fail CI when a required rule
 fails. Commands you do not provide are reported as not-applicable, not as
 failures.
 
@@ -86,6 +86,6 @@ scoring rules.
 
 ## Next
 
-- To build a real tool, read [Building a CLI with rungrad](building-a-cli.md).
+- To build a CLI, read [Building a CLI with rungrad](building-a-cli.md).
 - The worked reference tool is `cmd/rgref` in this repository; it scores 100%
   against the spec and is a good example to read.

@@ -4,8 +4,8 @@
 
 Where an API uses opaque identifiers, a tool accepts human names too. When a name
 is ambiguous it disambiguates interactively on a terminal, and under `--no-prompt`
-or `--json` it never blocks: it fails with the candidates listed so a caller can
-choose deterministically.
+or `--json` it never blocks: it fails with the candidates listed so a caller
+chooses deterministically.
 
 ## Rationale
 

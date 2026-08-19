@@ -39,7 +39,7 @@ Scaffold a new rungrad CLI project under `<dir>/<name>`.
 | `--docs-label <title>` | product name | README title |
 | `--example "<cmd>"` | | Extra generated command example; repeatable |
 
-The generated project builds, runs, and passes its own tests immediately. It
+The generated project builds, runs, and passes its tests. It
 refuses to overwrite an existing non-empty project directory. Product-only flags
 require `--product-profile`; the product scaffold still uses offline widget and
 update examples and keeps release wiring as comments/docs placeholders.
@@ -72,7 +72,7 @@ Missing, non-executable, or directory targets are usage errors and exit 1.
 | `--manifest auto\|off\|required` | Manifest discovery mode (default `auto`) |
 | `--update` | The target has an `update` command |
 | `--strict` | Exit non-zero if a required rule fails |
-| `--json` | Emit the full machine-readable score |
+| `--json` | Emit the full JSON score |
 
 Command values are passed as a single quoted string and split on spaces, for
 example `--read "widget list"`. Flags you omit make their probes not-applicable.

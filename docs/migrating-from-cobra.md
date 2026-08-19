@@ -1,15 +1,15 @@
 # Migrating from Cobra
 
-This guide is for teams with an existing Cobra CLI that need to move onto
-rungrad without rewriting their public contract. For a new product CLI, start
+This guide is for teams moving an existing Cobra CLI onto rungrad without
+rewriting their public contract. For a new product CLI, start
 from the product scaffold in [Getting started](getting-started.md#product-profile):
 
 ```bash
 rungrad new acmectl --product-profile
 ```
 
-For an existing CLI, use the scaffold as a comparison target, not as an
-automated porting tool. The porting path is: pin the behavior users and scripts
+For an existing CLI, use the scaffold as a comparison target, not as a
+porting tool. The porting path is: pin the behavior users and scripts
 already depend on, introduce rungrad behind those compatibility tests, then
 delete local bridge shims once the rungrad APIs below replace them.
 
@@ -27,7 +27,7 @@ shape to expect.
 
 ## Ownership boundary
 
-rungrad owns generic CLI mechanics:
+rungrad handles CLI mechanics:
 
 - execution lifecycle and validate-then-auth pre-runs
 - framework global flags and changed-state tracking
@@ -36,7 +36,7 @@ rungrad owns generic CLI mechanics:
 - manifest emission, docs/help/catalog gates, scaffolding, and conformance
   scoring
 
-The product owns domain and service behavior:
+The product handles domain and service behavior:
 
 - API and transport clients
 - auth and login protocols
@@ -64,24 +64,26 @@ The product owns domain and service behavior:
 
 3. Delete local bridge shims.
 
-   Once a shim maps directly to a Project 12 API below, delete the local copy and
+   Once a shim maps directly to a rungrad API below, delete the local copy and
    test the rungrad-owned path. Do not keep duplicate compatibility layers after
-   the framework owns the behavior.
+   the framework handles the behavior.
 
 ## Replace bridge workarounds
 
 ### Slice-flag reset
 
-Use ordinary pflag `StringArray`, `StringSlice`, and the rest of the pflag
-`SliceValue` family directly on root, persistent, local, inherited, nested, and
-reused-app command scopes. The reset fix is transparent in rungrad; there is no
+In stock pflag, a slice flag remembers it was set. When a command tree is reused,
+the next run may append to the previous run's values instead of replacing them.
+rungrad resets that state: use ordinary pflag `StringArray`,
+`StringSlice`, and the rest of the pflag `SliceValue` family directly on root,
+persistent, local, inherited, nested, and reused-app command scopes. There is no
 adopter method to call and no local marker/reset shim to keep.
 
 ### Host error rendering and exits
 
 Use [host-owned error rendering and exit codes](building-a-cli.md#host-owned-error-rendering-and-exit-codes)
 through `AppConfig.ErrorPolicy`. `Classify` returns the product exit code when
-the product owns a category, and `Render` writes the product's stderr shape.
+the product handles a category, and `Render` writes the product's stderr shape.
 Both hooks receive an `ErrorContext` with one classified exit code, a copied
 `GlobalFlags` snapshot, masked credential display fields, and
 `RedactString`/`RedactText`/`RedactJSON` helpers. The context intentionally does
@@ -113,7 +115,7 @@ Use [`manifest.ExtensionSet`](manifest.md#command-extensions) and
 `manifest.ExtensionObject` on `rungrad.Command`, mirrored on `CommandSpec`, for
 product-owned command metadata. The framework serializes that data through the
 `rungrad.extensions` annotation and validates catalog drift through
-`ValidateCatalog`. Product tests can enforce invariants with
+`ValidateCatalog`. Product tests enforce invariants with
 `RequireExtensionFields`, `RequireExtensionEnum`, and
 `RequireExtensionDocPath`.
 
@@ -161,7 +163,7 @@ agent-ready CLI contract, not API availability.
 - [ ] Mirror command metadata in a `CommandSpec` catalog and run
   `ValidateCatalog` or `testutil.AssertConsistent`.
 - [ ] Move product metadata into `manifest.ExtensionSet` when generic consumers
-  should see it.
+  need to see it.
 - [ ] Run `rungrad score` against the built binary with the commands that apply
   to the product.
 - [ ] Delete local bridge shims once their rungrad replacement is covered.
@@ -176,9 +178,9 @@ run them alongside the rungrad compatibility gates.
 ## Worked examples
 
 The committed [`internal/adopterfixture`](../internal/adopterfixture/adopterfixture.go)
-is a small "acmectl" CLI that exercises host-owned globals, a host
+is an "acmectl" CLI that exercises host-owned globals, a host
 `ErrorPolicy`, manifest extensions, catalog validation, docs/help/manifest
-consistency, a default manifest endpoint, and real-binary scoring together.
+consistency, a default manifest endpoint, and scoring a compiled binary.
 
 The [`cmd/rgref`](../cmd/rgref/main.go) reference CLI remains the compact
-from-scratch example and the full dogfood scoring target.
+from-scratch example and the full scoring target for the framework.

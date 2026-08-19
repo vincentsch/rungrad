@@ -2,14 +2,14 @@
 
 ## Criterion
 
-Every command's `--help` carries concrete examples and points to related
-commands, so the surface can be learned from the tool itself.
+Every command's `--help` includes examples and related commands, so the surface
+can be learned from the tool itself.
 
 ## Rationale
 
-An agent discovers what a tool can do by reading its help, not external docs.
-Examples show the real shape of an invocation, and related-command links let the
-agent navigate the surface without guessing names.
+An agent discovers the command surface by reading help, not external docs.
+Examples show the shape of an invocation, and related-command links let the
+agent navigate without guessing names.
 
 ## Testable assertions
 

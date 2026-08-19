@@ -2,16 +2,14 @@
 
 Version: `rungrad-spec/1`
 
-This is a short, language-neutral specification for command-line tools that both
-humans and AI agents can drive well. It exists because agents now run CLIs all
-day and need things humans tolerate the absence of: machine-readable output,
-safe previews before destructive actions, stable exit codes, names instead of
-opaque IDs, and help that explains itself.
+This specification is for command-line tools used by people, scripts, and CI. It
+covers CLI behavior that is often left undefined: JSON output, previews before
+destructive actions, stable exit codes, names instead of opaque IDs, and help
+with examples.
 
-The spec stands on its own. Any CLI in any language can conform to it. The
-rungrad Go framework is one implementation that provides these behaviors by
-default, and `rungrad score` measures any executable against the machine-readable
-ruleset in [`ruleset.yaml`](ruleset.yaml).
+The spec stands on its own. Any CLI in any language can follow it. The rungrad
+Go framework is one implementation, and `rungrad score` checks any executable
+against the ruleset in [`ruleset.yaml`](ruleset.yaml).
 
 ## Sections
 
