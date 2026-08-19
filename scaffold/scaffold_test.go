@@ -326,7 +326,7 @@ func TestScaffoldedProjectBuildsAndTests(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env := append(os.Environ(), "GOPROXY=off", "GOSUMDB=off", "GOFLAGS=-mod=mod")
+	env := prepareGeneratedModule(t, root)
 
 	gofmt := exec.Command("gofmt", "-l", ".")
 	gofmt.Dir = root
@@ -336,19 +336,38 @@ func TestScaffoldedProjectBuildsAndTests(t *testing.T) {
 		t.Fatalf("generated project is not gofmt-clean:\n%s", out)
 	}
 
-	tidy := exec.Command("go", "mod", "tidy")
-	tidy.Dir = root
-	tidy.Env = env
-	if out, err := tidy.CombinedOutput(); err != nil {
-		t.Fatalf("go mod tidy failed: %v\n%s", err, out)
-	}
-
 	test := exec.Command("go", "test", "./...")
 	test.Dir = root
 	test.Env = env
 	if out, err := test.CombinedOutput(); err != nil {
 		t.Fatalf("scaffolded project tests failed: %v\n%s", err, out)
 	}
+}
+
+func prepareGeneratedModule(t *testing.T, dir string) []string {
+	t.Helper()
+	runGo(t, dir, onlineGoEnv(), "mod", "tidy")
+	env := offlineGoEnv()
+	runGo(t, dir, env, "mod", "tidy")
+	return env
+}
+
+func runGo(t *testing.T, dir string, env []string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("go", args...)
+	cmd.Dir = dir
+	cmd.Env = env
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("go %s failed in %s: %v\n%s", strings.Join(args, " "), dir, err, out)
+	}
+}
+
+func onlineGoEnv() []string {
+	return append(os.Environ(), "GOSUMDB=off", "GOFLAGS=-mod=mod")
+}
+
+func offlineGoEnv() []string {
+	return append(os.Environ(), "GOPROXY=off", "GOSUMDB=off", "GOFLAGS=-mod=mod")
 }
 
 func requireContains(t *testing.T, got, want, label string) {

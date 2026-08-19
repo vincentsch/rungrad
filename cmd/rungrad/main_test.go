@@ -204,14 +204,7 @@ func TestScoreScaffoldedProjectJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env := append(os.Environ(), "GOPROXY=off", "GOSUMDB=off", "GOFLAGS=-mod=mod")
-
-	tidy := exec.Command("go", "mod", "tidy")
-	tidy.Dir = root
-	tidy.Env = env
-	if out, err := tidy.CombinedOutput(); err != nil {
-		t.Fatalf("go mod tidy failed: %v\n%s", err, out)
-	}
+	env := prepareGeneratedModule(t, root)
 
 	bin := filepath.Join(root, "scored")
 	build := exec.Command("go", "build", "-o", bin, ".")
@@ -330,9 +323,8 @@ func TestProductProfileDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env := append(os.Environ(), "GOPROXY=off", "GOSUMDB=off", "GOFLAGS=-mod=mod")
+	env := prepareGeneratedModule(t, root)
 
-	runGo(t, root, env, "mod", "tidy")
 	runGo(t, root, env, "test", "./...")
 
 	bin := filepath.Join(root, "prodtool")
@@ -368,9 +360,9 @@ func TestProductProfileHostSurfaceCLISmoke(t *testing.T) {
 	}
 
 	root := filepath.Join(tmp, "acmectl")
-	env := append(os.Environ(), "GOPROXY=off", "GOSUMDB=off", "GOFLAGS=-mod=mod")
+	env := offlineGoEnv()
 	runGo(t, root, env, "mod", "edit", "-replace", "github.com/vincentsch/rungrad="+repoRoot)
-	runGo(t, root, env, "mod", "tidy")
+	env = prepareGeneratedModule(t, root)
 	runGo(t, root, env, "test", "./...")
 
 	bin := filepath.Join(root, "acmectl")
@@ -587,6 +579,22 @@ func runGo(t *testing.T, dir string, env []string, args ...string) {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("go %s failed in %s: %v\n%s", strings.Join(args, " "), dir, err, out)
 	}
+}
+
+func prepareGeneratedModule(t *testing.T, dir string) []string {
+	t.Helper()
+	runGo(t, dir, onlineGoEnv(), "mod", "tidy")
+	env := offlineGoEnv()
+	runGo(t, dir, env, "mod", "tidy")
+	return env
+}
+
+func onlineGoEnv() []string {
+	return append(os.Environ(), "GOSUMDB=off", "GOFLAGS=-mod=mod")
+}
+
+func offlineGoEnv() []string {
+	return append(os.Environ(), "GOPROXY=off", "GOSUMDB=off", "GOFLAGS=-mod=mod")
 }
 
 func runGeneratedReadmeCommands(t *testing.T, bin string) {

@@ -26,13 +26,13 @@ checked with `rungrad score`.
 Requires Go 1.22.2 or newer.
 
 ```bash
-go install github.com/vincentsch/rungrad/cmd/rungrad@v0.2.1
+go install github.com/vincentsch/rungrad/cmd/rungrad@v0.2.2
 ```
 
 Add the framework to a Go module:
 
 ```bash
-go get github.com/vincentsch/rungrad@v0.2.1
+go get github.com/vincentsch/rungrad@v0.2.2
 ```
 
 ## Create a CLI
