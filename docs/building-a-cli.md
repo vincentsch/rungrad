@@ -77,8 +77,12 @@ Fields:
 - `Mutates: true` marks a state-changing command that should honor `--dry-run`.
 - `Destructive: true` marks a destructive command. It implies `Mutates` and is
   expected to gate the action behind `f.ConfirmDestructive` (see Dry run).
-- `RequiresAuth: true` makes the validate-then-auth pre-run hook load a credential
-  before the command runs, failing with the auth exit code when none is available.
+- `RequiresAuth: true` marks the command contract as authenticated. By default,
+  the validate-then-auth pre-run hook loads a credential before the command runs,
+  failing with the auth exit code when none is available.
+- `AuthResolution: rungrad.AuthResolutionHandler` is an escape hatch for
+  commands that still require authentication but must choose a credential after
+  command-local flags or selectors are resolved in the handler.
 - `Extensions` attaches product-owned command metadata to the manifest under
   namespaced keys such as `example.com/product`.
 - `GroupID` sorts the command under a named help group registered with
@@ -574,10 +578,21 @@ maps to the usage code.
 ## Config and credentials
 
 The Factory carries a `config.Store` resolved from `--config` and the tool name.
-The validate-then-auth pre-run hook loads the credential for commands marked
-`RequiresAuth` into `f.Token`. Credentials are read with env-then-file
-precedence, stored in a separate `0600` file, and masked for display with
-`config.Mask`. Never print `f.Token` raw; print `config.Mask(f.Token)`.
+For framework-owned auth, the validate-then-auth pre-run hook loads the
+credential for commands marked `RequiresAuth` into `f.Token`. Credentials are
+read with env-then-file precedence, stored in a separate `0600` file, and masked
+for display with `config.Mask`. Never print `f.Token` raw; print
+`config.Mask(f.Token)`.
+
+Commands with `RequiresAuth: true` and
+`AuthResolution: rungrad.AuthResolutionHandler` still publish
+`requires_auth: true` in docs, catalogs, and manifests, but rungrad stops after
+required-flag validation, output-mode validation, config/auth-file/profile, and
+service resolution. The handler receives a ready `Factory.Store`,
+`f.ConfigPath()`, `f.AuthFilePath()`, `f.Profile()`, and `f.Service(...)`, while
+`f.Token` and `f.Credential()` are empty. The handler then owns credential
+selection, loading, validation, and immediate `f.RegisterSecret(...)` calls for
+every token, refresh token, password, auth header, or other secret it discovers.
 
 ### Profiles, paths, and service endpoints
 
@@ -649,10 +664,10 @@ precedence runs. Missing config files are treated as an empty
 ### Custom credential resolution
 
 Set `AppConfig.Auth` to a `CredentialResolver` when the default
-env-then-stored-credential behavior is not enough. The resolver receives an
-`AuthContext` with the resolved profile, config path, auth-file path, env var,
-configured `config.Store`, injected env lookup, resolved services, and
-`RegisterSecret`.
+env-then-stored-credential behavior is not enough for framework-owned auth. The
+resolver receives an `AuthContext` with the resolved profile, config path,
+auth-file path, env var, configured `config.Store`, injected env lookup,
+resolved services, and `RegisterSecret`.
 
 Return a `rungrad.Credential` with the primary token, source label, optional
 display label, and adopter-defined `Extra` payload. The framework sets
@@ -660,6 +675,12 @@ display label, and adopter-defined `Extra` payload. The framework sets
 only `Credential.Token` for redaction. Any secret material placed in
 `Credential.Extra` or discovered elsewhere must be registered through
 `AuthContext.RegisterSecret`.
+
+When credential selection depends on command-local state, keep
+`RequiresAuth: true` and set `AuthResolution: rungrad.AuthResolutionHandler`
+instead of installing a placeholder global resolver. Handler-owned commands do
+not call `AppConfig.Auth`; they start with empty framework credential fields and
+must register their own secrets before writing output or returning errors.
 
 Returning `config.ErrMissingCredential` exits 3. Returning `config.Error`
 exits 1. Returning a `rungrad.Error` or any error with `ExitCode() int` uses

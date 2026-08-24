@@ -55,7 +55,7 @@ Arrays are always JSON arrays. Empty arrays are emitted as `[]`, never `null`.
 | `examples` | array of string | Examples from the command metadata or root `Example`. |
 | `related` | array of string | Related command paths from rungrad metadata, not parsed from help prose. |
 | `output_modes` | array of string | Declared machine/human output modes, such as `human` and `json`. |
-| `requires_auth` | bool | Whether rungrad metadata marks the command as requiring a credential. |
+| `requires_auth` | bool | Whether rungrad metadata marks the command contract as authenticated, independent of whether rungrad or the handler resolves the credential at runtime. |
 | `mutates` | bool | Whether rungrad metadata marks the command as changing state. |
 | `supports_dry_run` | bool | Whether the rungrad-emitted manifest says the mutating command honors `--dry-run`. |
 | `destructive` | bool | Whether rungrad metadata marks the command as destructive. |

@@ -1,9 +1,10 @@
 # Config and auth reference
 
 rungrad handles the resolution shape for profiles, config paths, auth-file
-paths, services, credential hooks, browser helpers, redaction of the primary
-token, and exit-code mapping. Product CLIs handle file formats, login
-protocols, URL derivation, and API validation.
+paths, services, framework-owned credential hooks, browser helpers, redaction of
+the primary framework token, and exit-code mapping. Product CLIs handle file
+formats, login protocols, URL derivation, API validation, and any handler-owned
+credential loading.
 
 ## Precedence
 
@@ -60,12 +61,22 @@ Service config lookup checks `Profile.BaseURL` for `base_url`, then
 Use `ResolutionConfig.LoadConfig` to normalize adopter-owned config formats into
 `config.Config` before generic resolution runs. A missing file is not an error.
 
-Use `AppConfig.Auth` to provide a `CredentialResolver`. The resolver receives
-`AuthContext`; use `AuthContext.Service(name)` for service endpoints and
+Use `AppConfig.Auth` to provide a `CredentialResolver` for framework-owned
+authenticated commands. The resolver receives `AuthContext`; use
+`AuthContext.Service(name)` for service endpoints and
 `AuthContext.RegisterSecret` for additional secret values.
 
 The default resolver preserves the compact behavior: credential env var, then
 stored credential for the resolved profile, then `config.ErrMissingCredential`.
+
+Commands can set both `RequiresAuth: true` and
+`AuthResolution: rungrad.AuthResolutionHandler` when credential selection has to
+happen in the handler after command-local flags are resolved. In that mode,
+rungrad still validates flags and output mode and resolves profile, config,
+auth-file, and services before the handler runs, but it does not call
+`AppConfig.Auth`, set `Factory.Token`, set `Factory.Credential()`, or
+auto-register a framework credential. The handler owns loading the selected
+credential and registering every secret with `Factory.RegisterSecret`.
 
 Use `Factory.BrowserOpener` or `testutil.Options.BrowserOpener` to inject browser
 opening. Use `browser.LoginFlow` for the open-then-poll loop.
@@ -74,7 +85,8 @@ opening. Use `browser.LoginFlow` for the open-then-poll loop.
 
 Adopters handle product config and auth-file formats, browser/device-login
 protocols, endpoint derivation, API validation, workspace or tenant semantics,
-and registering any secret beyond `Credential.Token`.
+handler-owned credential selection, and registering any secret beyond
+`Credential.Token`.
 
 rungrad auto-registers only the returned `Credential.Token`. Anything secret in
 `Credential.Extra`, refresh tokens, echoed token fragments, or product-specific

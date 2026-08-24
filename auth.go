@@ -9,8 +9,10 @@ import (
 	"github.com/vincentsch/rungrad/config"
 )
 
-// Credential is the resolved runtime credential a RequiresAuth command
-// consumes. It is distinct from config.Credential, which is the on-disk record.
+// Credential is the runtime credential resolved by the framework for a
+// framework-owned RequiresAuth command. It is distinct from config.Credential,
+// which is the on-disk record. Handler-owned auth commands start with an empty
+// Factory credential and load their own product credential in the handler.
 type Credential struct {
 	Token   string
 	Profile string
@@ -19,8 +21,8 @@ type Credential struct {
 	Extra   any
 }
 
-// AuthContext is handed to a CredentialResolver after profile/service/path
-// resolution and before the command handler runs.
+// AuthContext is handed to a framework-owned CredentialResolver after
+// profile/service/path resolution and before the command handler runs.
 type AuthContext struct {
 	Context        context.Context
 	Profile        string
@@ -42,8 +44,9 @@ func (ac *AuthContext) Service(name string) (config.ResolvedService, bool) {
 	return svc, ok
 }
 
-// CredentialResolver loads and may validate the credential for a RequiresAuth
-// command.
+// CredentialResolver loads and may validate the credential for a
+// framework-owned RequiresAuth command. Handler-owned auth commands do not call
+// this resolver.
 type CredentialResolver interface {
 	ResolveCredential(ac *AuthContext) (Credential, error)
 }

@@ -22,6 +22,8 @@ const (
 	AnnotationExtensions  = "rungrad.extensions"
 )
 
+const annotationAuthResolution = "rungrad.authResolution"
+
 // Canonical output-mode tokens recognized by the framework. Advanced-output
 // apps use these tokens in Command.OutputModes to enable per-command --plain,
 // --jq, and --template support.
@@ -31,6 +33,19 @@ const (
 	OutputModePlain    = "plain"
 	OutputModeJQ       = "jq"
 	OutputModeTemplate = "template"
+)
+
+// AuthResolution selects which layer resolves credentials for a command that
+// publicly requires authentication.
+type AuthResolution string
+
+const (
+	// AuthResolutionFramework keeps the default behavior: rungrad resolves the
+	// credential before invoking the handler.
+	AuthResolutionFramework AuthResolution = "framework"
+	// AuthResolutionHandler leaves credential selection and loading to the
+	// handler. The command still declares RequiresAuth for public metadata.
+	AuthResolutionHandler AuthResolution = "handler"
 )
 
 // Command is a thin builder over a cobra command that records the metadata
@@ -60,8 +75,12 @@ type Command struct {
 	// behind Factory.ConfirmDestructive.
 	Destructive bool
 	// RequiresAuth marks a command that needs a credential; the auth pre-run hook
-	// loads it before the command runs.
+	// loads it before the command runs unless AuthResolutionHandler is selected.
 	RequiresAuth bool
+	// AuthResolution selects whether rungrad or the handler owns credential
+	// resolution for a command that declares RequiresAuth. The zero value is
+	// AuthResolutionFramework.
+	AuthResolution AuthResolution
 	// SupportsMeta marks a command that can attach request metadata, making
 	// --include-meta valid in an advanced-output app and advertised in the
 	// manifest and generated docs.
@@ -89,8 +108,35 @@ func (c *Command) AddCommand(subs ...*Command) {
 	c.subcommands = append(c.subcommands, subs...)
 }
 
+func (c *Command) normalizedAuthResolution() AuthResolution {
+	if c.AuthResolution == "" {
+		return AuthResolutionFramework
+	}
+	return c.AuthResolution
+}
+
+func (c *Command) validateDeclarationTree() {
+	if c == nil {
+		panic("rungrad: command is nil")
+	}
+	owner := c.normalizedAuthResolution()
+	switch owner {
+	case AuthResolutionFramework:
+	case AuthResolutionHandler:
+		if !c.RequiresAuth {
+			panic(fmt.Sprintf("rungrad: command %q uses handler auth resolution without RequiresAuth", c.Use))
+		}
+	default:
+		panic(fmt.Sprintf("rungrad: command %q has invalid AuthResolution %q", c.Use, c.AuthResolution))
+	}
+	for _, sub := range c.subcommands {
+		sub.validateDeclarationTree()
+	}
+}
+
 // build constructs the cobra command tree for this command, binding it to f.
 func (c *Command) build(f *Factory) *cobra.Command {
+	authResolution := c.normalizedAuthResolution()
 	long := c.Long
 	if long == "" {
 		long = c.Short
@@ -134,6 +180,7 @@ func (c *Command) build(f *Factory) *cobra.Command {
 	}
 	if c.RequiresAuth {
 		cmd.Annotations[AnnotationAuth] = "required"
+		cmd.Annotations[annotationAuthResolution] = string(authResolution)
 	}
 	if c.SupportsMeta {
 		cmd.Annotations[AnnotationMeta] = "true"
