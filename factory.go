@@ -35,17 +35,19 @@ func (fn PagerFunc) Run(args []string, content io.Reader, stdout, stderr io.Writ
 }
 
 // Factory carries the dependencies a command needs to run: the resolved global
-// flags, the output writers, the config store, and the credential loaded by the
-// auth pre-run hook. Commands receive a *Factory and route all output through it
-// so dual rendering and determinism are guaranteed in one place.
+// flags, the output writers, the config store, and the framework-resolved
+// credential when the selected command uses framework-owned auth. Commands
+// receive a *Factory and route all output through it so dual rendering and
+// determinism are guaranteed in one place.
 type Factory struct {
 	Flags  *GlobalFlags
 	Stdin  io.Reader
 	Stdout io.Writer
 	Stderr io.Writer
 	Store  config.Store
-	// Token is the credential resolved by the auth pre-run hook for commands that
-	// require authentication. It is empty for commands that do not.
+	// Token is the primary credential resolved by the auth pre-run hook for
+	// framework-owned authenticated commands. It is empty for unauthenticated and
+	// handler-owned authenticated commands.
 	Token string
 
 	// PromptTerminal overrides terminal detection for tests and embedders. When
@@ -96,7 +98,8 @@ type Factory struct {
 	// resolved/resolvedSet hold the per-run profile/service/path resolution.
 	resolved    config.Resolved
 	resolvedSet bool
-	// credential holds the resolved runtime credential for RequiresAuth commands.
+	// credential holds the resolved runtime credential for framework-owned
+	// RequiresAuth commands.
 	credential Credential
 }
 
@@ -391,7 +394,9 @@ func (f *Factory) Service(name string) (config.ResolvedService, bool) {
 	return svc, ok
 }
 
-// Credential returns the runtime credential resolved for this command.
+// Credential returns the runtime credential resolved for this command by the
+// framework-owned auth path. Handler-owned authenticated commands start with the
+// zero Credential and must load/register their product credential themselves.
 func (f *Factory) Credential() Credential {
 	if f == nil {
 		return Credential{}

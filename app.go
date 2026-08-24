@@ -35,8 +35,10 @@ type AppConfig struct {
 	// Resolution enables opt-in profile/auth-file/service resolution and the
 	// matching global flags.
 	Resolution *ResolutionConfig
-	// Auth overrides credential resolution for RequiresAuth commands. Nil uses
-	// the default env-then-stored-credential resolver.
+	// Auth overrides framework-owned credential resolution for RequiresAuth
+	// commands. Nil uses the default env-then-stored-credential resolver. Commands
+	// using AuthResolutionHandler skip this resolver and start their handler with
+	// an empty Factory.Token and Credential.
 	Auth CredentialResolver
 	// Surface configures ownership of framework public surfaces. The zero value
 	// keeps rungrad's default behavior.
@@ -212,6 +214,9 @@ func (a *App) AddGroup(groups ...Group) {
 // AddCommand registers top-level commands.
 func (a *App) AddCommand(cmds ...*Command) {
 	for _, c := range cmds {
+		c.validateDeclarationTree()
+	}
+	for _, c := range cmds {
 		// Build first so Cobra applies its normal first-token Name() parsing
 		// before we compare against reserved framework command names.
 		built := c.build(a.factory)
@@ -262,6 +267,9 @@ func (a *App) preRunValidateThenAuth(cmd *cobra.Command, args []string) error {
 	// config/auth-file, and service fields from the Factory.
 	a.factory.storeReady = true
 	if cmd.Annotations[AnnotationAuth] != "required" {
+		return nil
+	}
+	if cmd.Annotations[annotationAuthResolution] == string(AuthResolutionHandler) {
 		return nil
 	}
 	services := map[string]config.ResolvedService(nil)

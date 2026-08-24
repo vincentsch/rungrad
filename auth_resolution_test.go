@@ -2,6 +2,7 @@ package rungrad_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,8 +14,24 @@ import (
 	"github.com/spf13/cobra"
 	rungrad "github.com/vincentsch/rungrad"
 	"github.com/vincentsch/rungrad/config"
+	"github.com/vincentsch/rungrad/docsgen"
 	"github.com/vincentsch/rungrad/testutil"
 )
+
+const privateAuthResolutionAnnotation = "rungrad.authResolution"
+
+var _ = rungrad.Command{
+	Use:          "legacy",
+	RequiresAuth: true,
+}
+
+var _ = rungrad.Command{
+	Use:            "private",
+	RequiresAuth:   true,
+	AuthResolution: rungrad.AuthResolutionHandler,
+}
+
+var _ rungrad.AuthResolution = rungrad.AuthResolutionFramework
 
 type resolverFunc func(*rungrad.AuthContext) (rungrad.Credential, error)
 
@@ -87,6 +104,54 @@ func resolutionTestApp(auth rungrad.CredentialResolver, mutate func(*rungrad.App
 			},
 		},
 		&rungrad.Command{
+			Use:            "framework",
+			Short:          "show explicit framework auth",
+			RequiresAuth:   true,
+			AuthResolution: rungrad.AuthResolutionFramework,
+			Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+				cred := f.Credential()
+				return f.WriteResult(map[string]any{
+					"token":            f.Token,
+					"credential_token": cred.Token,
+					"source":           cred.Source,
+				}, func(w io.Writer) {})
+			},
+		},
+		&rungrad.Command{
+			Use:            "public",
+			Short:          "show public data",
+			AuthResolution: rungrad.AuthResolutionFramework,
+			Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+				return f.WriteResult(map[string]any{
+					"token_empty":      f.Token == "",
+					"credential_empty": f.Credential() == (rungrad.Credential{}),
+				}, func(w io.Writer) {})
+			},
+		},
+		&rungrad.Command{
+			Use:            "handler",
+			Short:          "show handler-owned auth",
+			RequiresAuth:   true,
+			AuthResolution: rungrad.AuthResolutionHandler,
+			Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+				api, _ := f.Service("api")
+				region, _ := f.Service("region")
+				_, resolved := f.Resolved()
+				return f.WriteResult(map[string]any{
+					"resolved":         resolved,
+					"profile":          f.Profile(),
+					"config_path":      f.ConfigPath(),
+					"auth_file_path":   f.AuthFilePath(),
+					"api":              api.Value,
+					"api_source":       api.Source.String(),
+					"region":           region.Value,
+					"region_source":    region.Source.String(),
+					"token_empty":      f.Token == "",
+					"credential_empty": f.Credential() == (rungrad.Credential{}),
+				}, func(w io.Writer) {})
+			},
+		},
+		&rungrad.Command{
 			Use:   "browser",
 			Short: "open browser",
 			Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
@@ -124,6 +189,107 @@ func decodeMap(t *testing.T, r testutil.Result) map[string]any {
 		t.Fatalf("JSON: %v\n%s", err, r.Stdout)
 	}
 	return out
+}
+
+func findBuiltCommand(t *testing.T, app *rungrad.App, args ...string) *cobra.Command {
+	t.Helper()
+	cmd, _, err := app.Root().Find(args)
+	if err != nil {
+		t.Fatalf("Find(%v): %v", args, err)
+	}
+	return cmd
+}
+
+func TestAuthResolutionConstantsAndDefaultFramework(t *testing.T) {
+	if string(rungrad.AuthResolutionFramework) != "framework" {
+		t.Fatalf("AuthResolutionFramework = %q", rungrad.AuthResolutionFramework)
+	}
+	if string(rungrad.AuthResolutionHandler) != "handler" {
+		t.Fatalf("AuthResolutionHandler = %q", rungrad.AuthResolutionHandler)
+	}
+
+	app := resolutionTestApp(nil, nil)
+	for _, tt := range []struct {
+		path []string
+		want string
+	}{
+		{[]string{"whoami"}, "framework"},
+		{[]string{"framework"}, "framework"},
+		{[]string{"handler"}, "handler"},
+	} {
+		cmd := findBuiltCommand(t, app, tt.path...)
+		if cmd.Annotations[rungrad.AnnotationAuth] != "required" {
+			t.Fatalf("%v auth annotation = %q", tt.path, cmd.Annotations[rungrad.AnnotationAuth])
+		}
+		if got := cmd.Annotations[privateAuthResolutionAnnotation]; got != tt.want {
+			t.Fatalf("%v auth resolution annotation = %q, want %q", tt.path, got, tt.want)
+		}
+	}
+	public := findBuiltCommand(t, app, "public")
+	if public.Annotations[rungrad.AnnotationAuth] != "" || public.Annotations[privateAuthResolutionAnnotation] != "" {
+		t.Fatalf("public annotations = %+v, want no auth annotations", public.Annotations)
+	}
+}
+
+func TestAuthResolutionInvalidDeclarationsPreflightBeforeConfigure(t *testing.T) {
+	t.Run("invalid top-level", func(t *testing.T) {
+		app := rungrad.New(rungrad.AppConfig{Name: "rginvalid", Short: "invalid"})
+		configured := false
+		defer expectPanicContaining(t, `rungrad: command "bad" has invalid AuthResolution "bogus"`)()
+		defer func() {
+			if configured {
+				t.Fatal("Configure ran for invalid top-level declaration")
+			}
+			if cmd, _, _ := app.Root().Find([]string{"bad"}); cmd != app.Root() {
+				t.Fatalf("invalid top-level command was attached: %v", cmd.CommandPath())
+			}
+		}()
+		app.AddCommand(&rungrad.Command{
+			Use:            "bad",
+			AuthResolution: rungrad.AuthResolution("bogus"),
+			Configure:      func(*cobra.Command) { configured = true },
+		})
+	})
+
+	t.Run("handler without requires auth", func(t *testing.T) {
+		app := rungrad.New(rungrad.AppConfig{Name: "rginvalid", Short: "invalid"})
+		defer expectPanicContaining(t, `rungrad: command "bad" uses handler auth resolution without RequiresAuth`)()
+		app.AddCommand(&rungrad.Command{
+			Use:            "bad",
+			AuthResolution: rungrad.AuthResolutionHandler,
+		})
+	})
+
+	t.Run("invalid descendant", func(t *testing.T) {
+		app := rungrad.New(rungrad.AppConfig{Name: "rginvalid", Short: "invalid"})
+		var configured []string
+		parent := &rungrad.Command{
+			Use:       "parent",
+			Configure: func(*cobra.Command) { configured = append(configured, "parent") },
+		}
+		parent.AddCommand(
+			&rungrad.Command{
+				Use:       "good",
+				Configure: func(*cobra.Command) { configured = append(configured, "good") },
+			},
+			&rungrad.Command{
+				Use:            "bad",
+				RequiresAuth:   true,
+				AuthResolution: rungrad.AuthResolution("bogus"),
+				Configure:      func(*cobra.Command) { configured = append(configured, "bad") },
+			},
+		)
+		defer expectPanicContaining(t, `rungrad: command "bad" has invalid AuthResolution "bogus"`)()
+		defer func() {
+			if len(configured) != 0 {
+				t.Fatalf("Configure callbacks ran before preflight finished: %v", configured)
+			}
+			if cmd, _, _ := app.Root().Find([]string{"parent"}); cmd != app.Root() {
+				t.Fatalf("partial subtree was attached: %v", cmd.CommandPath())
+			}
+		}()
+		app.AddCommand(parent)
+	})
 }
 
 func TestResolutionServiceAndProfilePrecedence(t *testing.T) {
@@ -277,6 +443,68 @@ func TestProfileValidationBeforeAuth(t *testing.T) {
 	}
 }
 
+func TestHandlerAuthResolutionBypassesResolverWithResolvedState(t *testing.T) {
+	called := 0
+	app := resolutionTestApp(resolverFunc(func(*rungrad.AuthContext) (rungrad.Credential, error) {
+		called++
+		return rungrad.Credential{}, errors.New("framework resolver must not run")
+	}), nil)
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	writeResolutionConfig(t, cfgPath, config.Config{Version: 1})
+	res := testutil.Run(app,
+		"handler",
+		"--config", cfgPath,
+		"--profile", "selected",
+		"--base-url", "https://handler.api",
+		"--json",
+	)
+	out := decodeMap(t, res)
+	if called != 0 {
+		t.Fatalf("resolver calls = %d, want 0", called)
+	}
+	if out["resolved"] != true || out["profile"] != "selected" ||
+		out["config_path"] != cfgPath || out["api"] != "https://handler.api" ||
+		out["api_source"] != "flag" || out["token_empty"] != true ||
+		out["credential_empty"] != true {
+		t.Fatalf("handler output = %#v", out)
+	}
+	if app.Factory().Token != "" || app.Factory().Credential() != (rungrad.Credential{}) {
+		t.Fatalf("factory auth state after handler = token %q credential %+v",
+			app.Factory().Token, app.Factory().Credential())
+	}
+}
+
+func TestExplicitFrameworkAuthResolutionInvokesResolver(t *testing.T) {
+	called := 0
+	app := resolutionTestApp(resolverFunc(func(*rungrad.AuthContext) (rungrad.Credential, error) {
+		called++
+		return rungrad.Credential{Token: "explicit-framework-secret", Source: "custom"}, nil
+	}), nil)
+	out := decodeMap(t, testutil.Run(app, "framework", "--json"))
+	if called != 1 {
+		t.Fatalf("resolver calls = %d, want 1", called)
+	}
+	if out["source"] != "custom" || out["token"] != "[REDACTED]" || out["credential_token"] != "[REDACTED]" {
+		t.Fatalf("framework auth output = %#v", out)
+	}
+}
+
+func TestExplicitFrameworkResolutionWithoutAuthDoesNotInvokeResolver(t *testing.T) {
+	called := 0
+	app := resolutionTestApp(resolverFunc(func(*rungrad.AuthContext) (rungrad.Credential, error) {
+		called++
+		return rungrad.Credential{}, errors.New("resolver must not run")
+	}), nil)
+	out := decodeMap(t, testutil.Run(app, "public", "--json"))
+	if called != 0 {
+		t.Fatalf("resolver calls = %d, want 0", called)
+	}
+	if out["token_empty"] != true || out["credential_empty"] != true {
+		t.Fatalf("public output = %#v", out)
+	}
+}
+
 func TestDefaultResolverEnvFileAndMissingCredential(t *testing.T) {
 	app := resolutionTestApp(nil, nil)
 	out := decodeMap(t, testutil.RunWith(app, testutil.Options{
@@ -303,6 +531,313 @@ func TestDefaultResolverEnvFileAndMissingCredential(t *testing.T) {
 	res := testutil.Run(app, "whoami", "--config", filepath.Join(t.TempDir(), "missing.yaml"), "--json")
 	if res.Exit != rungrad.ExitAuth {
 		t.Fatalf("missing credential exit = %d, stderr=%q", res.Exit, res.Stderr)
+	}
+}
+
+func TestManualCobraAuthResolutionCompatibility(t *testing.T) {
+	for _, tt := range []struct {
+		name           string
+		ownerValue     string
+		wantResolver   int
+		wantTokenEmpty bool
+	}{
+		{name: "legacy missing owner", wantResolver: 1},
+		{name: "unexpected owner", ownerValue: "bogus", wantResolver: 1},
+		{name: "exact handler", ownerValue: "handler", wantTokenEmpty: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			app := rungrad.New(rungrad.AppConfig{
+				Name:  "rgmanual",
+				Short: "manual cobra",
+				Auth: resolverFunc(func(*rungrad.AuthContext) (rungrad.Credential, error) {
+					calls++
+					return rungrad.Credential{Token: "manual-secret-token", Source: "manual"}, nil
+				}),
+			})
+			annotations := map[string]string{rungrad.AnnotationAuth: "required"}
+			if tt.ownerValue != "" {
+				annotations[privateAuthResolutionAnnotation] = tt.ownerValue
+			}
+			app.Root().AddCommand(&cobra.Command{
+				Use:           "raw",
+				Short:         "raw cobra command",
+				SilenceUsage:  true,
+				SilenceErrors: true,
+				Annotations:   annotations,
+				RunE: func(cmd *cobra.Command, args []string) error {
+					return app.Factory().WriteResult(map[string]any{
+						"token_empty":      app.Factory().Token == "",
+						"credential_empty": app.Factory().Credential() == (rungrad.Credential{}),
+					}, func(w io.Writer) {})
+				},
+			})
+			out := decodeMap(t, testutil.Run(app, "raw", "--json"))
+			if calls != tt.wantResolver {
+				t.Fatalf("resolver calls = %d, want %d", calls, tt.wantResolver)
+			}
+			if out["token_empty"] != tt.wantTokenEmpty {
+				t.Fatalf("token_empty = %#v, want %t; out=%#v", out["token_empty"], tt.wantTokenEmpty, out)
+			}
+		})
+	}
+}
+
+func TestHandlerAuthResolutionValidationFailuresPrecedeOwnerWork(t *testing.T) {
+	tests := []struct {
+		name      string
+		args      []string
+		advanced  bool
+		outputs   []string
+		configure func(*cobra.Command)
+		want      string
+	}{
+		{
+			name: "required flag",
+			args: []string{"owned"},
+			configure: func(cmd *cobra.Command) {
+				cmd.Flags().String("name", "", "name")
+				if err := cmd.MarkFlagRequired("name"); err != nil {
+					t.Fatal(err)
+				}
+			},
+			want: `required flag(s) "name" not set`,
+		},
+		{
+			name: "flag group",
+			args: []string{"owned", "--left", "--right"},
+			configure: func(cmd *cobra.Command) {
+				cmd.Flags().Bool("left", false, "left")
+				cmd.Flags().Bool("right", false, "right")
+				cmd.MarkFlagsMutuallyExclusive("left", "right")
+			},
+			want: `if any flags in the group [left right] are set none of the others can be; [left right] were all set`,
+		},
+		{
+			name:     "output mode",
+			args:     []string{"owned", "--plain"},
+			advanced: true,
+			outputs:  []string{rungrad.OutputModeHuman, rungrad.OutputModeJSON},
+			want:     `"rgowned owned" does not support --plain`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolverCalls := 0
+			handlerCalls := 0
+			app := rungrad.New(rungrad.AppConfig{
+				Name:           "rgowned",
+				Short:          "owned auth",
+				AdvancedOutput: tt.advanced,
+				Auth: resolverFunc(func(*rungrad.AuthContext) (rungrad.Credential, error) {
+					resolverCalls++
+					return rungrad.Credential{Token: "secret"}, nil
+				}),
+			})
+			app.AddCommand(&rungrad.Command{
+				Use:            "owned",
+				Short:          "owned auth",
+				OutputModes:    tt.outputs,
+				RequiresAuth:   true,
+				AuthResolution: rungrad.AuthResolutionHandler,
+				Configure:      tt.configure,
+				Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+					handlerCalls++
+					return nil
+				},
+			})
+			res := testutil.Run(app, tt.args...)
+			if res.Exit != rungrad.ExitUsage || res.Stdout != "" {
+				t.Fatalf("result = %#v, want usage with empty stdout", res)
+			}
+			if !strings.Contains(res.Stderr, tt.want) {
+				t.Fatalf("stderr = %q, want containing %q", res.Stderr, tt.want)
+			}
+			if resolverCalls != 0 || handlerCalls != 0 {
+				t.Fatalf("owner work ran: resolver=%d handler=%d", resolverCalls, handlerCalls)
+			}
+		})
+	}
+}
+
+func TestHandlerAuthResolutionErrorUsesExistingAuthExitPolicy(t *testing.T) {
+	app := rungrad.New(rungrad.AppConfig{Name: "rgowned", Short: "owned auth", AdvancedOutput: true})
+	app.AddCommand(&rungrad.Command{
+		Use:            "owned",
+		Short:          "owned auth",
+		RequiresAuth:   true,
+		AuthResolution: rungrad.AuthResolutionHandler,
+		Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+			return config.ErrMissingCredential
+		},
+	})
+	res := testutil.Run(app, "owned", "--json")
+	if res.Exit != rungrad.ExitAuth || res.Stdout != "" {
+		t.Fatalf("result = %#v, want auth failure with empty stdout", res)
+	}
+	if !json.Valid([]byte(res.Stderr)) || !strings.Contains(res.Stderr, `"exit_code": 3`) {
+		t.Fatalf("stderr is not normal machine auth error JSON: %q", res.Stderr)
+	}
+}
+
+func TestHandlerAuthResolutionPublicProjectionsHideOwner(t *testing.T) {
+	resolverCalls := 0
+	handlerCalls := 0
+	app := rungrad.New(rungrad.AppConfig{
+		Name:    "rgowned",
+		Short:   "owned auth",
+		Version: "1.0.0",
+		Auth: resolverFunc(func(*rungrad.AuthContext) (rungrad.Credential, error) {
+			resolverCalls++
+			return rungrad.Credential{Token: "secret"}, nil
+		}),
+	})
+	app.AddModule(stubModule{
+		commands: []*rungrad.Command{{
+			Use:            "owned",
+			Short:          "owned auth",
+			RequiresAuth:   true,
+			AuthResolution: rungrad.AuthResolutionHandler,
+			Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+				handlerCalls++
+				return nil
+			},
+		}},
+		specs: []rungrad.CommandSpec{{
+			Path:         "owned",
+			Summary:      "owned auth",
+			RequiresAuth: true,
+		}},
+	})
+	if err := app.ValidateCatalog(); err != nil {
+		t.Fatalf("ValidateCatalog() = %v", err)
+	}
+
+	m, manifestResult := readManifest(t, app)
+	if resolverCalls != 0 || handlerCalls != 0 {
+		t.Fatalf("manifest touched owner work: resolver=%d handler=%d", resolverCalls, handlerCalls)
+	}
+	owned := findManifestCommand(&m, "owned")
+	if owned == nil || !owned.RequiresAuth {
+		t.Fatalf("owned manifest entry = %+v", owned)
+	}
+	if app.Factory().Store != (config.Store{}) || app.Factory().Token != "" ||
+		app.Factory().Credential() != (rungrad.Credential{}) {
+		t.Fatalf("manifest left factory auth/resolution state: store=%+v token=%q credential=%+v",
+			app.Factory().Store, app.Factory().Token, app.Factory().Credential())
+	}
+	docs := docsgen.Generate(app)
+	if page := docs["rgowned_owned.md"]; !strings.Contains(page, "## Authentication") {
+		t.Fatalf("owned docs missing authentication section:\n%s", page)
+	}
+	help := testutil.Run(app, "owned", "--help")
+	if help.Exit != rungrad.ExitSuccess {
+		t.Fatalf("help exit = %d stderr=%q", help.Exit, help.Stderr)
+	}
+	completion := testutil.Run(app, "__complete", "")
+	if completion.Exit != rungrad.ExitSuccess {
+		t.Fatalf("completion exit = %d stderr=%q", completion.Exit, completion.Stderr)
+	}
+	for label, text := range map[string]string{
+		"manifest":   manifestResult.Stdout,
+		"docs":       strings.Join(mapValues(docs), "\n"),
+		"help":       help.Stdout,
+		"completion": completion.Stdout + completion.Stderr,
+	} {
+		if strings.Contains(text, privateAuthResolutionAnnotation) {
+			t.Fatalf("%s leaked private auth annotation:\n%s", label, text)
+		}
+	}
+}
+
+func mapValues(m map[string]string) []string {
+	out := make([]string, 0, len(m))
+	for _, v := range m {
+		out = append(out, v)
+	}
+	return out
+}
+
+func TestAuthResolutionResetIsolationAcrossReusableApp(t *testing.T) {
+	const frameworkSecret = "framework-secret-token"
+	const handlerSecret = "handler-secret-token"
+	newApp := func() *rungrad.App {
+		app := rungrad.New(rungrad.AppConfig{
+			Name:  "rgreset",
+			Short: "reset auth",
+			Auth: resolverFunc(func(*rungrad.AuthContext) (rungrad.Credential, error) {
+				return rungrad.Credential{
+					Token: frameworkSecret,
+					Extra: handlerSecret,
+				}, nil
+			}),
+		})
+		app.AddCommand(
+			&rungrad.Command{
+				Use:          "framework",
+				Short:        "framework auth",
+				RequiresAuth: true,
+				Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+					return f.WriteResult(map[string]any{
+						"token":                  f.Token,
+						"credential_empty":       f.Credential() == (rungrad.Credential{}),
+						"handler_secret_literal": f.Credential().Extra,
+					}, func(w io.Writer) {})
+				},
+			},
+			&rungrad.Command{
+				Use:            "handler",
+				Short:          "handler auth",
+				RequiresAuth:   true,
+				AuthResolution: rungrad.AuthResolutionHandler,
+				Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
+					f.RegisterSecret(handlerSecret)
+					return f.WriteResult(map[string]any{
+						"token_empty":              f.Token == "",
+						"credential_empty":         f.Credential() == (rungrad.Credential{}),
+						"framework_secret_literal": frameworkSecret,
+						"handler_secret":           handlerSecret,
+					}, func(w io.Writer) {})
+				},
+			},
+		)
+		return app
+	}
+
+	app := newApp()
+	firstFramework := testutil.Run(app, "framework", "--json")
+	if firstFramework.Exit != rungrad.ExitSuccess ||
+		!strings.Contains(firstFramework.Stdout, `"token": "[REDACTED]"`) ||
+		!strings.Contains(firstFramework.Stdout, handlerSecret) {
+		t.Fatalf("first framework result = %#v", firstFramework)
+	}
+	handler := testutil.Run(app, "handler", "--json")
+	if handler.Exit != rungrad.ExitSuccess ||
+		!strings.Contains(handler.Stdout, frameworkSecret) ||
+		!strings.Contains(handler.Stdout, `"handler_secret": "[REDACTED]"`) ||
+		!strings.Contains(handler.Stdout, `"token_empty": true`) ||
+		!strings.Contains(handler.Stdout, `"credential_empty": true`) {
+		t.Fatalf("handler after framework result = %#v", handler)
+	}
+	secondFramework := testutil.Run(app, "framework", "--json")
+	if secondFramework.Exit != rungrad.ExitSuccess ||
+		!strings.Contains(secondFramework.Stdout, `"token": "[REDACTED]"`) ||
+		!strings.Contains(secondFramework.Stdout, handlerSecret) {
+		t.Fatalf("framework after handler result = %#v", secondFramework)
+	}
+
+	app = newApp()
+	firstHandler := testutil.Run(app, "handler", "--json")
+	if firstHandler.Exit != rungrad.ExitSuccess ||
+		!strings.Contains(firstHandler.Stdout, frameworkSecret) ||
+		!strings.Contains(firstHandler.Stdout, `"token_empty": true`) {
+		t.Fatalf("first handler result = %#v", firstHandler)
+	}
+	frameworkAfterHandler := testutil.Run(app, "framework", "--json")
+	if frameworkAfterHandler.Exit != rungrad.ExitSuccess ||
+		!strings.Contains(frameworkAfterHandler.Stdout, `"token": "[REDACTED]"`) ||
+		!strings.Contains(frameworkAfterHandler.Stdout, handlerSecret) {
+		t.Fatalf("framework after first handler result = %#v", frameworkAfterHandler)
 	}
 }
 
