@@ -50,6 +50,36 @@ disables framework global flags. When `--json`, `--no-prompt`, or `--dry-run`
 are renamed, hidden, disabled, differently typed, or have a non-`false` default,
 `agentmeta` treats their canonical semantics as absent.
 
+## Scaffolded repository skills
+
+The product scaffold can generate a conservative repository-scoped skill:
+
+```bash
+rungrad new acmectl --product-profile --skill
+```
+
+That flag adds:
+
+- `.agents/skills/acmectl/SKILL.md`
+- `.agents/README.md`
+
+The skill directory name matches the `SKILL.md` frontmatter `name`. Agents that
+scan repository skills can discover the file from the repository root or from a
+child working directory inside the repository.
+
+The generated skill is built from a validated scaffold-time manifest projected
+through `agentmeta.FromManifest`. It renders only an allowlist: the validated tool
+name, generated command templates, read/mutation/destructive capability guidance,
+the scaffold's read-only `update --check` pattern, and fixed reviewed prose. It
+does not render product descriptions, service URLs, config paths, auth paths,
+arbitrary examples, extension values, direct API instructions, or provider
+claims.
+
+Product maintainers should review the generated text and keep it aligned with
+their command surface. rungrad intentionally does not generate `.codex-plugin/`,
+`.mcp.json`, Claude plugin files, MCP server code, hosted-tool descriptors, or
+marketplace metadata.
+
 ## What the projection includes
 
 Each command keeps the manifest path, `use`, short text, examples, related

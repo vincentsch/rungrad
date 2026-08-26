@@ -28,6 +28,7 @@ Scaffold a new rungrad CLI project under `<dir>/<name>`.
 | `--dir <path>` | `.` | Parent directory to create the project in |
 | `--dry-run` | | List the files that would be created without writing them |
 | `--product-profile` | `false` | Generate the expanded product CLI scaffold |
+| `--skill` | `false` | Generate repository-scoped agent skill files for the product profile |
 | `--env-prefix <PREFIX>` | derived from `<name>` | Product env-var prefix |
 | `--product-name <name>` | `<name> CLI` | Human product label |
 | `--description <text>` | product starter description | Root long description |
@@ -49,6 +50,7 @@ rungrad new mytool
 rungrad new mytool --module github.com/me/mytool --dir ~/code
 rungrad new mytool --dry-run --json
 rungrad new acmectl --product-profile --env-prefix ACME --product-name "Acme Control"
+rungrad new acmectl --product-profile --skill
 ```
 
 ## `rungrad score <target>`

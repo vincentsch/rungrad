@@ -117,7 +117,7 @@ func newCommand() *rungrad.Command {
 	return &rungrad.Command{
 		Use:         "new <name>",
 		Short:       "Scaffold a new rungrad CLI",
-		Examples:    []string{"rungrad new mytool", "rungrad new mytool --module github.com/me/mytool", "rungrad new acmectl --product-profile --env-prefix ACME --product-name \"Acme Control\""},
+		Examples:    []string{"rungrad new mytool", "rungrad new mytool --module github.com/me/mytool", "rungrad new acmectl --product-profile --env-prefix ACME --product-name \"Acme Control\"", "rungrad new acmectl --product-profile --skill"},
 		Related:     []string{"rungrad score"},
 		OutputModes: []string{"table", "json"},
 		Mutates:     true,
@@ -136,6 +136,7 @@ func newCommand() *rungrad.Command {
 			cmd.Flags().String("release-repo", "", "Release repo placeholder (commented example only)")
 			cmd.Flags().String("docs-label", "", "Docs/README title (default: product name)")
 			cmd.Flags().StringArray("example", nil, "Extra command example, e.g. \"<tool> widget list\" (repeatable; product profile)")
+			cmd.Flags().Bool("skill", false, "Generate repository-scoped agent skill files for the product profile")
 		},
 		Run: func(f *rungrad.Factory, cmd *cobra.Command, args []string) error {
 			name := args[0]
@@ -162,6 +163,7 @@ func newCommand() *rungrad.Command {
 			releaseRepo, _ := cmd.Flags().GetString("release-repo")
 			docsLabel, _ := cmd.Flags().GetString("docs-label")
 			examples, _ := cmd.Flags().GetStringArray("example")
+			skill, _ := cmd.Flags().GetBool("skill")
 			if productProfile {
 				// pflag's StringArray parsing drops an explicit empty value. Treat
 				// Changed+empty as invalid input before scaffold.Options loses that
@@ -187,6 +189,7 @@ func newCommand() *rungrad.Command {
 				ReleaseOwner:      releaseOwner,
 				ReleaseRepo:       releaseRepo,
 				Examples:          examples,
+				Skill:             skill,
 			}
 
 			if f.DryRun() {
@@ -235,6 +238,7 @@ func productFlagNames() []string {
 		"release-repo",
 		"docs-label",
 		"example",
+		"skill",
 	}
 }
 
