@@ -154,6 +154,7 @@ that score.
 - [Migrating from Cobra](docs/migrating-from-cobra.md): port an existing Cobra CLI without changing its public surface
 - [Config and auth reference](docs/config-and-auth.md): profiles, auth files, services, and credential hooks
 - [Machine manifest](docs/manifest.md): the hidden manifest protocol
+- [Agent distribution metadata](docs/agent-distribution.md): manifest projection and integration boundaries
 - [Conformance and the spec](docs/conformance.md): the agent-ready spec and the scorer
 - [CLI reference](docs/cli-reference.md): the `rungrad` command (`score`, `new`)
 

@@ -68,6 +68,10 @@ The root command has `path: []`. Its `related` field is `[]` because root relate
 commands are ordinary help prose, not command metadata. Its `local_flags` field
 is usually `[]` because global flags are reported once in `global_flags`.
 
+Consumers that need repository-scoped skill material or manual adapter inventory
+can pass a validated manifest to `agentmeta.FromManifest`; see
+[Agent distribution metadata](agent-distribution.md).
+
 ## Command extensions
 
 Commands may carry product-owned extension metadata under `extensions`. Each
