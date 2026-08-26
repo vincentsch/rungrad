@@ -56,6 +56,12 @@ command, a delete command that requires confirmation, an offline `update
 --check`, tests, a README, and a hidden `__rungrad_manifest` command. Replace
 the widget code with your own API or data.
 
+For a product-shaped starter with repository-scoped agent skill files:
+
+```bash
+rungrad new acmectl --product-profile --skill
+```
+
 Try the same command as text and as JSON:
 
 ```bash

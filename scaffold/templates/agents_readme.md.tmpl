@@ -1,0 +1,19 @@
+# Repository Agent Files
+
+rungrad generated repository-scoped agent files for `{{.Tool}}`.
+
+- Skill: `{{.SkillPath}}`
+
+Agents that scan repository skills can discover the skill from the repository root or from a child working directory inside this repository.
+
+Product maintainers should review the generated skill, keep command guidance in sync when CLI behavior changes, and replace generic credential guidance with links to external product authentication documentation.
+
+Provider-specific packaging and runtime files are intentionally absent:
+
+- `.codex-plugin/`
+- `.mcp.json`
+- Claude plugin files
+- hosted-tool descriptors
+- remote marketplace metadata
+
+MCP adapters, direct API clients, OAuth, permission policy, hosted integrations, and provider publication remain product-owned work.

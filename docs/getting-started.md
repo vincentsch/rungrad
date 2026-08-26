@@ -53,13 +53,15 @@ rungrad new acmectl \
   --product-name "Acme Control" \
   --service api=https://api.example.invalid \
   --metadata-namespace example.com/acme \
-  --surface host
+  --surface host \
+  --skill
 ```
 
 `--product-profile` keeps the widget example but adds product identity,
 profile/auth-file/config resolution, service endpoints, manifest extensions, and
-release placeholders. The product-only flags are documented in the
-[CLI reference](cli-reference.md).
+release placeholders. `--skill` adds `.agents/skills/acmectl/SKILL.md` and
+`.agents/README.md` as repository-scoped agent starter files. The product-only
+flags are documented in the [CLI reference](cli-reference.md).
 
 ## Score a CLI against the spec
 

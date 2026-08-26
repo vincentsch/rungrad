@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -23,6 +24,38 @@ func TestNewDryRunListsFiles(t *testing.T) {
 	}
 	if !json.Valid([]byte(res.Stdout)) {
 		t.Fatalf("dry-run --json not valid JSON: %s", res.Stdout)
+	}
+}
+
+func TestNewProductProfileSkillDryRunListsFilesAndWritesNothing(t *testing.T) {
+	dir := t.TempDir()
+	res := testutil.Run(newApp(), "new", "demo", "--dir", dir, "--product-profile", "--skill", "--dry-run", "--json")
+	if res.Exit != rungrad.ExitSuccess {
+		t.Fatalf("exit %d: %s", res.Exit, res.Stderr)
+	}
+	var body struct {
+		Dir   string   `json:"dir"`
+		Files []string `json:"files"`
+	}
+	if err := json.Unmarshal([]byte(res.Stdout), &body); err != nil {
+		t.Fatalf("dry-run --json not valid JSON: %v\n%s", err, res.Stdout)
+	}
+	wantFiles := []string{
+		".agents/README.md",
+		".agents/skills/demo/SKILL.md",
+		"README.md",
+		"go.mod",
+		"main.go",
+		"main_test.go",
+	}
+	if !reflect.DeepEqual(body.Files, wantFiles) {
+		t.Fatalf("dry-run files = %v, want %v", body.Files, wantFiles)
+	}
+	if body.Dir != filepath.Join(dir, "demo") {
+		t.Fatalf("dry-run dir = %q, want %q", body.Dir, filepath.Join(dir, "demo"))
+	}
+	if _, err := os.Stat(filepath.Join(dir, "demo")); !os.IsNotExist(err) {
+		t.Fatalf("dry-run should not write project directory, stat error = %v", err)
 	}
 }
 
@@ -67,6 +100,8 @@ func TestNewProductFlagWithoutProfileExitsUsage(t *testing.T) {
 		{name: "non-empty env prefix", args: []string{"--env-prefix", "ACME"}, want: "--env-prefix requires --product-profile"},
 		{name: "empty surface", args: []string{"--surface="}, want: "--surface requires --product-profile"},
 		{name: "empty product name", args: []string{"--product-name="}, want: "--product-name requires --product-profile"},
+		{name: "skill", args: []string{"--skill"}, want: "--skill requires --product-profile"},
+		{name: "skill false", args: []string{"--skill=false"}, want: "--skill requires --product-profile"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			args := append([]string{"new", "demo", "--dry-run"}, tt.args...)
@@ -318,6 +353,7 @@ func TestProductProfileDefaults(t *testing.T) {
 	root, err := scaffold.Write(t.TempDir(), scaffold.Options{
 		Name:           "prodtool",
 		ProductProfile: true,
+		Skill:          true,
 		RungradReplace: repoRoot,
 	})
 	if err != nil {
@@ -326,6 +362,7 @@ func TestProductProfileDefaults(t *testing.T) {
 	env := prepareGeneratedModule(t, root)
 
 	runGo(t, root, env, "test", "./...")
+	assertGeneratedSkillFiles(t, root, "prodtool")
 
 	bin := filepath.Join(root, "prodtool")
 	runGo(t, root, env, "build", "-o", bin, ".")
@@ -635,5 +672,15 @@ func assertScaffoldScorePerfect(t *testing.T, bin string) {
 	}
 	if score.Manifest.Status != conformance.ManifestPresent {
 		t.Fatalf("manifest status = %q, want %q\n%s", score.Manifest.Status, conformance.ManifestPresent, res.Stdout)
+	}
+}
+
+func assertGeneratedSkillFiles(t *testing.T, root, tool string) {
+	t.Helper()
+	for _, rel := range []string{".agents/README.md", filepath.Join(".agents", "skills", tool, "SKILL.md")} {
+		full := filepath.Join(root, rel)
+		if _, err := os.Stat(full); err != nil {
+			t.Fatalf("expected generated skill file %s: %v", full, err)
+		}
 	}
 }

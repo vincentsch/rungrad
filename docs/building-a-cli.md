@@ -1016,6 +1016,9 @@ The product scaffold also demonstrates `manifest.ExtensionSet` on a command and
 keeps the default manifest endpoint available for offline scoring. It does not
 enable advanced output or host error rendering by default.
 
+Add `--skill` to the product scaffold when you want repository-scoped starter
+files under `.agents/skills/<tool>/SKILL.md` and `.agents/README.md`.
+
 For an existing Cobra CLI, generate a product scaffold with matching names and
 service placeholders, then use it as a comparison target while porting by hand:
 compare root `AppConfig`, global flag ownership, command metadata, output

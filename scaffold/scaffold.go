@@ -42,6 +42,13 @@ var productTemplateMap = map[string]string{
 	"templates/product_readme.md.tmpl":    "README.md",
 }
 
+// productSkillReadmeTemplateMap maps embedded repository-skill support
+// templates whose destination paths are static. The SKILL.md path includes the
+// validated tool name, so it is added separately.
+var productSkillReadmeTemplateMap = map[string]string{
+	"templates/agents_readme.md.tmpl": ".agents/README.md",
+}
+
 // Options configures a scaffold.
 type Options struct {
 	// Name is the program name and binary name.
@@ -56,6 +63,8 @@ type Options struct {
 	// ProductProfile enables the expanded product CLI scaffold. When false, all
 	// product fields must be left at their zero value.
 	ProductProfile bool
+	// Skill adds repository-scoped agent skill files to the product profile.
+	Skill bool
 	// EnvPrefix is the product environment-variable prefix. Defaults to a value
 	// derived from Name.
 	EnvPrefix string
@@ -135,7 +144,20 @@ func Generate(o Options) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return render(productTemplateMap, data)
+	files, err := render(productTemplateMap, data)
+	if err != nil {
+		return nil, err
+	}
+	if o.Skill {
+		skillFiles, err := renderProductSkillFiles(data)
+		if err != nil {
+			return nil, err
+		}
+		for path, content := range skillFiles {
+			files[path] = content
+		}
+	}
+	return files, nil
 }
 
 func render(templateMap map[string]string, data any) (map[string]string, error) {
@@ -253,6 +275,7 @@ func rejectProductFields(o Options) error {
 		{flag: "--release-owner", set: o.ReleaseOwner != ""},
 		{flag: "--release-repo", set: o.ReleaseRepo != ""},
 		{flag: "--example", set: len(o.Examples) > 0},
+		{flag: "--skill", set: o.Skill},
 	} {
 		if f.set {
 			return &ValidationError{Message: fmt.Sprintf("scaffold: %s requires --product-profile", f.flag)}
