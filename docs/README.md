@@ -13,6 +13,7 @@ starter commands with your own code.
 - [Config and auth reference](config-and-auth.md): profiles, auth files, services, and credential hooks
 - [Conformance and the spec](conformance.md): the agent-ready spec and the `rungrad score` scorer
 - [Machine manifest](manifest.md): the `__rungrad_manifest` protocol for agents and the scorer
+- [Agent distribution metadata](agent-distribution.md): manifest projection and integration boundaries
 - [CLI reference](cli-reference.md): the `rungrad` command (`score`, `new`)
 
 The written specification lives in [`../spec/`](../spec/README.md). It stands on

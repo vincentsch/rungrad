@@ -967,6 +967,10 @@ are pinned by `TestManifestReferenceCommands`, `TestManifestReferenceOutputModes
 and `TestManifestGlobalFlagsIncludeAdvanced` in
 [`cmd/rgref/manifest_test.go`](../cmd/rgref/manifest_test.go).
 
+For repository-scoped skill material and manual adapter curation, project the
+typed manifest through `agentmeta.FromManifest`; see
+[Agent distribution metadata](agent-distribution.md).
+
 For product-owned metadata that needs to appear in the machine manifest but is not
 part of rungrad's core command contract, set `Command.Extensions`:
 
