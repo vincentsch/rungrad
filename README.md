@@ -32,13 +32,13 @@ checked with `rungrad score`.
 Requires Go 1.22.2 or newer.
 
 ```bash
-go install github.com/vincentsch/rungrad/cmd/rungrad@v0.2.2
+go install github.com/vincentsch/rungrad/cmd/rungrad@v0.3.0
 ```
 
 Add the framework to a Go module:
 
 ```bash
-go get github.com/vincentsch/rungrad@v0.2.2
+go get github.com/vincentsch/rungrad@v0.3.0
 ```
 
 ## Create a CLI
@@ -61,6 +61,10 @@ For a product-shaped starter with repository-scoped agent skill files:
 ```bash
 rungrad new acmectl --product-profile --skill
 ```
+
+The skill file is a reviewed starter, not an MCP server or hosted integration.
+It describes the generated CLI commands and the safe ways an agent should call
+them.
 
 Try the same command as text and as JSON:
 

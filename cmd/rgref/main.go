@@ -18,7 +18,7 @@ import (
 	"github.com/vincentsch/rungrad/update"
 )
 
-const version = "v0.2.2"
+const version = "v0.3.0"
 
 // item is a fixture resource. Two items share the name "dup" so name resolution
 // has something ambiguous to resolve. Size and Label are deliberately visible in
