@@ -89,6 +89,36 @@ func TestGenerateRejectsInvalidNames(t *testing.T) {
 	}
 }
 
+func TestProductProfileSkillRejectsInvalidSkillNames(t *testing.T) {
+	for _, name := range []string{"acme-", "acme--ctl", strings.Repeat("a", 65)} {
+		t.Run(name, func(t *testing.T) {
+			_, err := scaffold.Generate(scaffold.Options{Name: name, ProductProfile: true, Skill: true})
+			var validation *scaffold.ValidationError
+			if !errors.As(err, &validation) {
+				t.Fatalf("Generate(%q) error = %T %v, want ValidationError", name, err, err)
+			}
+			if !strings.Contains(validation.Error(), "skill name must be 1-64") {
+				t.Fatalf("validation error = %q, want skill-name constraint", validation.Error())
+			}
+		})
+	}
+}
+
+func TestProductProfileWithoutSkillPreservesScaffoldNameGrammar(t *testing.T) {
+	for _, name := range []string{"acme-", "acme--ctl", strings.Repeat("a", 65)} {
+		t.Run(name, func(t *testing.T) {
+			for _, opts := range []scaffold.Options{
+				{Name: name},
+				{Name: name, ProductProfile: true},
+			} {
+				if _, err := scaffold.Generate(opts); err != nil {
+					t.Fatalf("Generate(%+v) error = %v, want nil", opts, err)
+				}
+			}
+		})
+	}
+}
+
 func TestGenerateRejectsInvalidModule(t *testing.T) {
 	_, err := scaffold.Generate(scaffold.Options{Name: "mytool", Module: "example.com/my tool"})
 	var validation *scaffold.ValidationError

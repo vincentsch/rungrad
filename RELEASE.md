@@ -38,11 +38,15 @@ contract tests: `TestProductProfileSkillFrontmatterScalarNames`,
 `TestProductProfileSkillHostileInputsDoNotAffectAgentFiles`,
 `TestProductProfileNoStalePlaceholders`,
 `TestProductManifestMatchesRuntimeAgentMetadata`,
+`TestProductProfileSkillRejectsInvalidSkillNames`,
+`TestProductProfileWithoutSkillPreservesScaffoldNameGrammar`,
+`TestNewProductProfileSkillRejectsInvalidSkillNames`,
 `TestNewProductProfileSkillDryRunListsFilesAndWritesNothing`,
 `TestNewProductFlagWithoutProfileExitsUsage`, and
 `TestProductProfileDefaults`. Together they cover quoted `SKILL.md`
-frontmatter, repository-scoped skill generation, product-text isolation,
-manifest parity, and CLI gating.
+frontmatter, Agent Skills name constraints for generated skills,
+repository-scoped skill generation, product-text isolation, manifest parity, and
+CLI gating.
 
 Run public wording and artifact scans over public docs, specs, release notes,
 generated user-facing templates, and agent metadata. Expected results: no

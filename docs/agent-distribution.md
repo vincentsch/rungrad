@@ -68,7 +68,9 @@ That flag adds:
 
 The skill directory name matches the `SKILL.md` frontmatter `name`. Agents that
 scan repository skills can discover the file from the repository root or from a
-child working directory inside the repository.
+child working directory inside the repository. When `--skill` is used, the tool
+name must also satisfy Agent Skills name constraints: 1-64 lowercase letters,
+digits, or hyphens, with no leading, trailing, or consecutive hyphens.
 
 The generated skill is built from a validated scaffold-time manifest projected
 through `agentmeta.FromManifest`. It renders only an allowlist: the validated tool
