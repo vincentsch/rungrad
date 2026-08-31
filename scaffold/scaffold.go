@@ -168,6 +168,9 @@ func render(templateMap map[string]string, data any) (map[string]string, error) 
 			return nil, err
 		}
 		t, err := template.New(dst).Funcs(template.FuncMap{
+			// strconv.Quote also serves as YAML double-quoting for
+			// agent_skill.md.tmpl; validName excludes quotes, backslashes, and
+			// non-ASCII.
 			"goquote": strconv.Quote,
 			"joinLines": func(xs []string) string {
 				return strings.Join(xs, "\n")

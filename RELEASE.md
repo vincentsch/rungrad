@@ -30,6 +30,26 @@ git grep -n -i -E 'token|secret'
 Review every hit. Auth, config, and redaction tests may be legitimate; docs,
 scripts, and unexpected files need closer review.
 
+## Agent Skills
+
+Before release, confirm the mandatory test run includes the generated-skill
+contract tests: `TestProductProfileSkillFrontmatterScalarNames`,
+`TestProductProfileSkillGenerate`, `TestProductProfileSkillIsDeterministic`,
+`TestProductProfileSkillHostileInputsDoNotAffectAgentFiles`,
+`TestProductProfileNoStalePlaceholders`,
+`TestProductManifestMatchesRuntimeAgentMetadata`,
+`TestNewProductProfileSkillDryRunListsFilesAndWritesNothing`,
+`TestNewProductFlagWithoutProfileExitsUsage`, and
+`TestProductProfileDefaults`. Together they cover quoted `SKILL.md`
+frontmatter, repository-scoped skill generation, product-text isolation,
+manifest parity, and CLI gating.
+
+Run public wording and artifact scans over public docs, specs, release notes,
+generated user-facing templates, and agent metadata. Expected results: no
+tracked `.agents/`, `.codex-plugin/`, `.mcp.json`, plugin/provider package,
+private-history, or raw QA artifact paths; and MCP wording only as boundary or
+non-capability statements, not as typed-server or runtime-generation claims.
+
 ## Tag
 
 Use annotated tags:
@@ -48,9 +68,22 @@ tag instead.
 Use a clean environment with public module settings and an empty module cache:
 
 ```bash
+tmp="$(mktemp -d)"
+export GOMODCACHE="$tmp/modcache"
+export GOPROXY=https://proxy.golang.org,direct
+export GOSUMDB=sum.golang.org
+unset GOPRIVATE GONOPROXY GONOSUMDB
+
 go install github.com/vincentsch/rungrad/cmd/rungrad@vX.Y.Z
+
 rungrad new demo
-cd demo
-go mod tidy
-go test ./...
+(cd demo && go mod tidy && go test ./...)
+
+rungrad new skilldemo --product-profile --skill
+cd skilldemo
+test -f .agents/README.md && test -f .agents/skills/skilldemo/SKILL.md && echo "agent files present"
+go mod tidy && go test ./...
+
+go clean -modcache
+rm -rf "$tmp"
 ```
