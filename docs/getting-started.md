@@ -8,13 +8,13 @@ scaffolding and scoring them.
 Install the tool:
 
 ```bash
-go install github.com/vincentsch/rungrad/cmd/rungrad@v0.3.0
+go install github.com/vincentsch/rungrad/cmd/rungrad@v0.3.1
 ```
 
 Add the framework to an existing Go module:
 
 ```bash
-go get github.com/vincentsch/rungrad@v0.3.0
+go get github.com/vincentsch/rungrad@v0.3.1
 ```
 
 ## Scaffold a new CLI
