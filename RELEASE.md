@@ -43,7 +43,7 @@ contract tests: `TestProductProfileSkillFrontmatterScalarNames`,
 `TestNewProductProfileSkillRejectsInvalidSkillNames`,
 `TestNewProductProfileSkillDryRunListsFilesAndWritesNothing`,
 `TestNewProductFlagWithoutProfileExitsUsage`, and
-`TestProductProfileDefaults`. Together they cover quoted `SKILL.md`
+`TestProductProfileDefaultsGenerate`. Together they cover quoted `SKILL.md`
 frontmatter, Agent Skills name constraints for generated skills,
 repository-scoped skill generation, product-text isolation, manifest parity, and
 CLI gating.
