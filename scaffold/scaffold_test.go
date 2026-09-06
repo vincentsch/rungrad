@@ -549,14 +549,29 @@ func TestReleaseChecklistClearsPrivateModuleOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := strings.Join([]string{
+	want := []string{
+		`export GOMODCACHE="$tmp/modcache"`,
+		`export GOBIN="$tmp/bin"`,
 		"export GOPROXY=https://proxy.golang.org,direct",
 		"export GOSUMDB=sum.golang.org",
 		"unset GOPRIVATE GONOPROXY GONOSUMDB",
-		"",
+		`trap 'go clean -modcache; rm -rf "$tmp"' EXIT`,
 		"go install github.com/vincentsch/rungrad/cmd/rungrad@vX.Y.Z",
-	}, "\n")
-	requireContains(t, string(release), want, "RELEASE.md")
+		`"$GOBIN/rungrad" --version`,
+		`cd "$tmp"`,
+		`"$GOBIN/rungrad" new demo`,
+		`"$GOBIN/rungrad" new skilldemo --product-profile --skill`,
+	}
+	next := 0
+	for _, line := range strings.Split(string(release), "\n") {
+		if strings.TrimSpace(line) == want[next] {
+			next++
+			if next == len(want) {
+				return
+			}
+		}
+	}
+	t.Fatalf("RELEASE.md missing ordered verification command %q", want[next])
 }
 
 // TestScaffoldedProjectBuildsAndTests proves the generated project compiles and
