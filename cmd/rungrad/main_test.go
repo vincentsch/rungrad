@@ -91,6 +91,20 @@ func TestNewInvalidNameExitsUsage(t *testing.T) {
 	}
 }
 
+func TestNewProductProfileSkillRejectsInvalidSkillNames(t *testing.T) {
+	for _, name := range []string{"acme-", "acme--ctl", strings.Repeat("a", 65)} {
+		t.Run(name, func(t *testing.T) {
+			res := testutil.Run(newApp(), "new", name, "--dir", t.TempDir(), "--product-profile", "--skill", "--dry-run")
+			if res.Exit != rungrad.ExitUsage {
+				t.Fatalf("invalid skill name exit = %d, want %d (stderr=%q)", res.Exit, rungrad.ExitUsage, res.Stderr)
+			}
+			if !strings.Contains(res.Stderr, "skill name must be 1-64") {
+				t.Fatalf("stderr did not explain skill-name constraint: %q", res.Stderr)
+			}
+		})
+	}
+}
+
 func TestNewProductFlagWithoutProfileExitsUsage(t *testing.T) {
 	for _, tt := range []struct {
 		name string

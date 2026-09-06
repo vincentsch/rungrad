@@ -30,6 +30,30 @@ git grep -n -i -E 'token|secret'
 Review every hit. Auth, config, and redaction tests may be legitimate; docs,
 scripts, and unexpected files need closer review.
 
+## Agent Skills
+
+Before release, confirm the mandatory test run includes the generated-skill
+contract tests: `TestProductProfileSkillFrontmatterScalarNames`,
+`TestProductProfileSkillGenerate`, `TestProductProfileSkillIsDeterministic`,
+`TestProductProfileSkillHostileInputsDoNotAffectAgentFiles`,
+`TestProductProfileNoStalePlaceholders`,
+`TestProductManifestMatchesRuntimeAgentMetadata`,
+`TestProductProfileSkillRejectsInvalidSkillNames`,
+`TestProductProfileWithoutSkillPreservesScaffoldNameGrammar`,
+`TestNewProductProfileSkillRejectsInvalidSkillNames`,
+`TestNewProductProfileSkillDryRunListsFilesAndWritesNothing`,
+`TestNewProductFlagWithoutProfileExitsUsage`, and
+`TestProductProfileDefaultsGenerate`. Together they cover quoted `SKILL.md`
+frontmatter, Agent Skills name constraints for generated skills,
+repository-scoped skill generation, product-text isolation, manifest parity, and
+CLI gating.
+
+Run public wording and artifact scans over public docs, specs, release notes,
+generated user-facing templates, and agent metadata. Expected results: no
+tracked `.agents/`, `.codex-plugin/`, `.mcp.json`, plugin/provider package,
+private-history, or raw QA artifact paths; and MCP wording only as boundary or
+non-capability statements, not as typed-server or runtime-generation claims.
+
 ## Tag
 
 Use annotated tags:
@@ -45,12 +69,33 @@ tag instead.
 
 ## Verify
 
-Use a clean environment with public module settings and an empty module cache:
+Use public module settings, an empty module cache, and the newly installed
+binary. The subshell keeps the temporary settings out of your current shell:
 
 ```bash
-go install github.com/vincentsch/rungrad/cmd/rungrad@vX.Y.Z
-rungrad new demo
-cd demo
-go mod tidy
-go test ./...
+(
+  set -eu
+  tmp="$(mktemp -d)"
+  export GOMODCACHE="$tmp/modcache"
+  export GOBIN="$tmp/bin"
+  export GOPROXY=https://proxy.golang.org,direct
+  export GOSUMDB=sum.golang.org
+  unset GOPRIVATE GONOPROXY GONOSUMDB
+  trap 'go clean -modcache; rm -rf "$tmp"' EXIT
+
+  go install github.com/vincentsch/rungrad/cmd/rungrad@vX.Y.Z
+  "$GOBIN/rungrad" --version
+  cd "$tmp"
+
+  "$GOBIN/rungrad" new demo
+  (cd demo && go mod tidy && go test ./...)
+
+  "$GOBIN/rungrad" new skilldemo --product-profile --skill
+  (
+    cd skilldemo
+    test -f .agents/README.md
+    test -f .agents/skills/skilldemo/SKILL.md
+    go mod tidy && go test ./...
+  )
+)
 ```

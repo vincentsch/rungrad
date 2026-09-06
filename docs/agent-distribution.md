@@ -26,6 +26,9 @@ A repository-scoped skill is a `SKILL.md` file under
 `.agents/skills/<name>/`. Product repositories own that file and decide which
 manifest fields are allowed to appear in it.
 
+A plugin is a packaged, installable distribution of one or more skills. rungrad
+does not generate plugin packaging.
+
 An agent metadata document is the `agentmeta.Document` returned by
 `agentmeta.FromManifest`. It is an inventory for commands, visible flags,
 examples, output modes, mutation metadata, request-metadata support, and
@@ -65,7 +68,9 @@ That flag adds:
 
 The skill directory name matches the `SKILL.md` frontmatter `name`. Agents that
 scan repository skills can discover the file from the repository root or from a
-child working directory inside the repository.
+child working directory inside the repository. When `--skill` is used, the tool
+name must also satisfy Agent Skills name constraints: 1-64 lowercase letters,
+digits, or hyphens, with no leading, trailing, or consecutive hyphens.
 
 The generated skill is built from a validated scaffold-time manifest projected
 through `agentmeta.FromManifest`. It renders only an allowlist: the validated tool
@@ -79,6 +84,8 @@ Product maintainers should review the generated text and keep it aligned with
 their command surface. rungrad intentionally does not generate `.codex-plugin/`,
 `.mcp.json`, Claude plugin files, MCP server code, hosted-tool descriptors, or
 marketplace metadata.
+
+The generated files are repository-scoped skills. Packaging them for installation or broader distribution as a plugin remains product-owned work.
 
 ## What the projection includes
 

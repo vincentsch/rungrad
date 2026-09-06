@@ -101,6 +101,7 @@ func (e *ValidationError) Error() string { return e.Message }
 func (e *ValidationError) ExitCode() int { return 1 }
 
 var validName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+var validSkillName = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 var validProductEnvPrefixRE = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 var validReleaseSlugRE = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
 
@@ -129,6 +130,13 @@ func validateNameModule(o Options) error {
 	return nil
 }
 
+func validateSkillName(name string) error {
+	if len(name) > 64 || !validSkillName.MatchString(name) {
+		return &ValidationError{Message: "scaffold: skill name must be 1-64 lowercase letters, digits, or hyphens with no leading, trailing, or consecutive hyphens"}
+	}
+	return nil
+}
+
 // Generate returns the project files as a map of relative path to content.
 func Generate(o Options) (map[string]string, error) {
 	if err := validateNameModule(o); err != nil {
@@ -149,6 +157,9 @@ func Generate(o Options) (map[string]string, error) {
 		return nil, err
 	}
 	if o.Skill {
+		if err := validateSkillName(o.Name); err != nil {
+			return nil, err
+		}
 		skillFiles, err := renderProductSkillFiles(data)
 		if err != nil {
 			return nil, err
@@ -168,6 +179,9 @@ func render(templateMap map[string]string, data any) (map[string]string, error) 
 			return nil, err
 		}
 		t, err := template.New(dst).Funcs(template.FuncMap{
+			// strconv.Quote also serves as YAML double-quoting for
+			// agent_skill.md.tmpl; validName excludes quotes, backslashes, and
+			// non-ASCII.
 			"goquote": strconv.Quote,
 			"joinLines": func(xs []string) string {
 				return strings.Join(xs, "\n")
