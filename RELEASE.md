@@ -69,25 +69,33 @@ tag instead.
 
 ## Verify
 
-Use a clean environment with public module settings and an empty module cache:
+Use public module settings, an empty module cache, and the newly installed
+binary. The subshell keeps the temporary settings out of your current shell:
 
 ```bash
-tmp="$(mktemp -d)"
-export GOMODCACHE="$tmp/modcache"
-export GOPROXY=https://proxy.golang.org,direct
-export GOSUMDB=sum.golang.org
-unset GOPRIVATE GONOPROXY GONOSUMDB
+(
+  set -eu
+  tmp="$(mktemp -d)"
+  export GOMODCACHE="$tmp/modcache"
+  export GOBIN="$tmp/bin"
+  export GOPROXY=https://proxy.golang.org,direct
+  export GOSUMDB=sum.golang.org
+  unset GOPRIVATE GONOPROXY GONOSUMDB
+  trap 'go clean -modcache; rm -rf "$tmp"' EXIT
 
-go install github.com/vincentsch/rungrad/cmd/rungrad@vX.Y.Z
+  go install github.com/vincentsch/rungrad/cmd/rungrad@vX.Y.Z
+  "$GOBIN/rungrad" --version
+  cd "$tmp"
 
-rungrad new demo
-(cd demo && go mod tidy && go test ./...)
+  "$GOBIN/rungrad" new demo
+  (cd demo && go mod tidy && go test ./...)
 
-rungrad new skilldemo --product-profile --skill
-cd skilldemo
-test -f .agents/README.md && test -f .agents/skills/skilldemo/SKILL.md && echo "agent files present"
-go mod tidy && go test ./...
-
-go clean -modcache
-rm -rf "$tmp"
+  "$GOBIN/rungrad" new skilldemo --product-profile --skill
+  (
+    cd skilldemo
+    test -f .agents/README.md
+    test -f .agents/skills/skilldemo/SKILL.md
+    go mod tidy && go test ./...
+  )
+)
 ```
