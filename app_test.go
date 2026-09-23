@@ -459,7 +459,7 @@ func TestConfirmDestructiveNonInteractiveRefusesWithoutReadingStdin(t *testing.T
 }
 
 func TestConfirmDestructiveInteractiveAccepts(t *testing.T) {
-	for _, answer := range []string{"y\n", "yes\n", "Y\n", "YES\n"} {
+	for _, answer := range []string{"y\n", "yes\n", "Y\n", "YES\n", "1\n"} {
 		res := testutil.RunWith(demoApp(), testutil.Options{
 			Stdin:       strings.NewReader(answer),
 			Terminal:    true,
@@ -471,6 +471,25 @@ func TestConfirmDestructiveInteractiveAccepts(t *testing.T) {
 		if !strings.Contains(res.Stdout, "Deleted") {
 			t.Fatalf("answer %q: missing deletion report: %q", answer, res.Stdout)
 		}
+	}
+}
+
+func TestConfirmDestructiveOffersLabelledChoicesAndBlankIsSafe(t *testing.T) {
+	res := testutil.RunWith(demoApp(), testutil.Options{
+		Stdin:       strings.NewReader("\n"),
+		Terminal:    true,
+		TerminalSet: true,
+	}, "delete", "thing")
+	if res.Exit != rungrad.ExitUsage {
+		t.Fatalf("a blank answer must keep the safe default and decline: exit %d", res.Exit)
+	}
+	for _, want := range []string{"1) Yes, continue", "2) No, cancel", "Choose 1-2 [2]"} {
+		if !strings.Contains(res.Stderr, want) {
+			t.Fatalf("prompt missing %q: %q", want, res.Stderr)
+		}
+	}
+	if strings.Contains(res.Stderr, "[y/N]") {
+		t.Fatalf("old y/N prompt still rendered: %q", res.Stderr)
 	}
 }
 
@@ -631,5 +650,24 @@ func TestRuntimeErrorWithUsageWordsExitsAPI(t *testing.T) {
 	code := app.Run([]string{"upload"}, &out, &errb)
 	if code != rungrad.ExitAPI {
 		t.Fatalf("exit = %d, want %d (stderr=%q)", code, rungrad.ExitAPI, errb.String())
+	}
+}
+
+func TestFactoryChooserHonoursTerminalSettings(t *testing.T) {
+	f := &rungrad.Factory{Flags: &rungrad.GlobalFlags{NoANSI: true}}
+	if c := f.Chooser(); !c.Plain || !c.NoColor {
+		t.Fatalf("--no-ansi must force plain line mode without colour: %+v", c)
+	}
+	f = &rungrad.Factory{Flags: &rungrad.GlobalFlags{NoColor: true}}
+	if c := f.Chooser(); c.Plain || !c.NoColor {
+		t.Fatalf("--no-color keeps the menu but drops colour: %+v", c)
+	}
+	t.Setenv("NO_COLOR", "1")
+	f = &rungrad.Factory{Flags: &rungrad.GlobalFlags{}}
+	if c := f.Chooser(); !c.NoColor {
+		t.Fatalf("NO_COLOR must drop colour: %+v", c)
+	}
+	if f.Chooser().Transform == nil {
+		t.Fatal("chooser output must be redacted")
 	}
 }

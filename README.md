@@ -32,13 +32,13 @@ checked with `rungrad score`.
 Requires Go 1.22.2 or newer.
 
 ```bash
-go install github.com/vincentsch/rungrad/cmd/rungrad@v0.3.1
+go install github.com/vincentsch/rungrad/cmd/rungrad@v0.3.2
 ```
 
 Add the framework to a Go module:
 
 ```bash
-go get github.com/vincentsch/rungrad@v0.3.1
+go get github.com/vincentsch/rungrad@v0.3.2
 ```
 
 ## Create a CLI
@@ -126,6 +126,8 @@ fail CI when a required rule fails.
 - JSON and text output from the same command result.
 - `--dry-run` previews for mutating commands.
 - Confirmation before destructive actions.
+- Multiple-choice questions: arrow keys and Enter on a terminal, a numbered
+  list everywhere else, through the `choose` package.
 - Stable exit codes for scripts and agents.
 - Name-to-ID resolution that fails with candidates instead of prompting when
   non-interactive.
