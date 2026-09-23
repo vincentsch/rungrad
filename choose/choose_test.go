@@ -168,3 +168,27 @@ func TestWrappedRowsCountsDisplayColumns(t *testing.T) {
 		t.Fatalf("oneLine = %q", got)
 	}
 }
+
+func TestMenuLoneEscFollowedByTypedArrowLettersDeclines(t *testing.T) {
+	// Esc, a pause, then the user types "OAdd a line" and Enter: with nothing
+	// waiting after the Esc it is a lone Esc, and the letters are ignored.
+	r := newKeyReader(strings.NewReader("\x1bOAdd a line\r"))
+	r.waiting = func() bool { return false }
+	m, err := decide(r, model{cursor: 1, count: 2}, nil)
+	if err != nil || !m.chosen || m.cursor != 1 {
+		t.Fatalf("typed OA after a lone Esc confirmed: %+v %v", m, err)
+	}
+	r = newKeyReader(strings.NewReader("\x1b[A\r"))
+	r.waiting = func() bool { return true }
+	if m, _ := decide(r, model{cursor: 1, count: 2}, nil); m.cursor != 0 {
+		t.Fatalf("a real arrow sequence must still move: %+v", m)
+	}
+}
+
+func TestDisplayWidthCountsCommonEmojiAsWide(t *testing.T) {
+	for _, r := range []string{"🚀", "✅", "⭐"} {
+		if got := displayWidth(r); got != 2 {
+			t.Fatalf("%s width = %d, want 2", r, got)
+		}
+	}
+}

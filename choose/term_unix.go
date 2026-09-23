@@ -26,6 +26,16 @@ func discardPendingInput(fd int) {
 	}
 }
 
+// byteWaiting reports whether another input byte arrives within 30ms, which
+// tells a key sequence (sent in one burst) apart from a lone Esc.
+func byteWaiting(fd int) func() bool {
+	return func() bool {
+		fds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}}
+		n, err := unix.Poll(fds, 30)
+		return err == nil && n > 0
+	}
+}
+
 // restoreOnSignal puts the terminal back before the process dies from a
 // termination signal while the menu is in raw mode, then lets the signal take
 // its normal course. Ctrl-C does not raise SIGINT in raw mode; it arrives as a

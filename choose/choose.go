@@ -229,7 +229,9 @@ func (c Chooser) chooseRaw(inFD, outFD int, question string, options []Option, d
 		return 0, fmt.Errorf("write choice prompt: %w", err)
 	}
 	var redrawErr error
-	m, err = decide(newKeyReader(c.In), m, func(m model) {
+	keys := newKeyReader(c.In)
+	keys.waiting = byteWaiting(inFD)
+	m, err = decide(keys, m, func(m model) {
 		c.clear(rows)
 		if rows, redrawErr = c.render(question, options, m.cursor, width()); redrawErr != nil {
 			redrawErr = fmt.Errorf("write choice prompt: %w", redrawErr)
@@ -244,10 +246,10 @@ func (c Chooser) chooseRaw(inFD, outFD int, question string, options []Option, d
 	case err != nil:
 		return 0, err
 	case m.canceled:
-		fmt.Fprint(c.Out, c.text(question)+" "+c.dim("canceled")+"\r\n")
+		fmt.Fprint(c.Out, oneLine(c.text(question))+" "+c.dim("canceled")+"\r\n")
 		return 0, ErrCanceled
 	}
-	fmt.Fprint(c.Out, c.text(question)+" "+c.bold(c.text(options[m.cursor].Label))+"\r\n")
+	fmt.Fprint(c.Out, oneLine(c.text(question))+" "+c.bold(oneLine(c.text(options[m.cursor].Label)))+"\r\n")
 	return m.cursor, nil
 }
 
@@ -337,8 +339,8 @@ func displayWidth(s string) int {
 		case r >= 0x0300 && r <= 0x036f, r == 0x200d, r >= 0xfe00 && r <= 0xfe0f:
 		case r >= 0x1100 && r <= 0x115f, r >= 0x2e80 && r <= 0xa4cf, r >= 0xac00 && r <= 0xd7a3,
 			r >= 0xf900 && r <= 0xfaff, r >= 0xfe30 && r <= 0xfe4f, r >= 0xff00 && r <= 0xff60,
-			r >= 0xffe0 && r <= 0xffe6, r >= 0x1f300 && r <= 0x1f64f, r >= 0x1f900 && r <= 0x1f9ff,
-			r >= 0x20000 && r <= 0x3fffd:
+			r >= 0xffe0 && r <= 0xffe6, r >= 0x2600 && r <= 0x27bf, r >= 0x2b00 && r <= 0x2bff,
+			r >= 0x1f000 && r <= 0x1faff, r >= 0x20000 && r <= 0x3fffd:
 			w += 2
 		default:
 			w++
@@ -408,6 +410,11 @@ func (m model) step(k key) model {
 type keyReader struct {
 	in      io.Reader
 	pending []byte
+	// waiting, when set, reports whether another byte is already available
+	// within a few milliseconds. Terminals send a key sequence in one burst,
+	// so an Esc with nothing right behind it is a lone Esc, even if the user
+	// then types "[A" or "OA" by hand.
+	waiting func() bool
 }
 
 func newKeyReader(in io.Reader) *keyReader { return &keyReader{in: in} }
@@ -456,6 +463,9 @@ func (r *keyReader) next() (key, error) {
 // to a CSI sequence ends it and is put back too, so Enter or Ctrl-C after a
 // malformed sequence still counts. Only plain up and down arrows move.
 func (r *keyReader) escape() (key, error) {
+	if len(r.pending) == 0 && r.waiting != nil && !r.waiting() {
+		return keyNone, nil
+	}
 	second, err := r.byte()
 	if err != nil {
 		return keyNone, err
