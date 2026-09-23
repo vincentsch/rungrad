@@ -551,28 +551,35 @@ For destructive actions, mark the command `Destructive: true`, register a local
 
 `ConfirmDestructive` is safe in every mode: under `--dry-run` it returns without
 prompting; with `--confirm` it proceeds; on a terminal it asks on stderr with
-two labelled choices, "Yes, continue" and "No, cancel", highlighting the safe one
-so a bare Enter never deletes anything; and under machine output (`--json`, `--jq`, or
+two labelled choices, "Yes, continue" and "No, cancel", with the safe one
+preselected, so a bare Enter never deletes anything; and under machine output (`--json`, `--jq`, or
 `--template`), `--no-prompt`, or no terminal it refuses with the usage exit code
 (1) instead of blocking, so an agent is never stuck. The refusal body is the
 standard JSON error on stderr under `--json`.
 
 ## Asking a question
 
-For any other interactive choice, use the `choose` package instead of printing
-`[y/N]` yourself. On a real terminal the user moves with the arrow keys (or
-`j`/`k`) and presses Enter, or types the option number; everywhere else (pipes,
-tests, `TERM=dumb`, Windows consoles, `--no-ansi`) the same question renders as
-a numbered list, and typing the start of a label such as `y` still works.
+For any other interactive choice, use the factory's chooser instead of
+printing `[y/N]` yourself. On a real terminal the user moves the highlight with
+the arrow keys (or `j`/`k`, a number, or `y`/`n`) and must press Enter to
+choose, so a stray key, a function key or pasted text never picks an answer.
+Everywhere else (pipes, tests, `TERM=dumb`, Windows consoles, `--no-ansi`) the
+same question renders as a numbered list that accepts only an option number, a
+full label, or `y`/`yes`/`n`/`no`.
 
 ```go
-ok, err := choose.Chooser{In: f.Stdin, Out: f.Stderr, Plain: f.Flags.NoANSI}.
-    Confirm("You are already logged in to Acme. Log in again?", "Log in again", "Keep the current login")
+if !f.CanPrompt() {
+    return rungrad.NewError(rungrad.ExitUsage, "already logged in; re-run with --force to replace it")
+}
+ok, err := f.Chooser().Confirm(
+    "You are already logged in to Acme.", "Log in again", "Keep the current login")
 ```
 
-Write options as plain actions a user would say out loud, never internal ids.
-`choose` does not decide whether asking is allowed: check non-interactive mode
-first and give the command a flag that answers the question for automation.
+`f.Chooser()` redacts everything it prints and honours `--no-ansi`,
+`--no-color` and `NO_COLOR`. Write answers as plain actions a user would say out
+loud, never internal ids. The second answer is preselected, so make it the safe
+one. Always check `f.CanPrompt()` first and give the command a flag that answers
+the question for automation.
 
 ## Name resolution
 

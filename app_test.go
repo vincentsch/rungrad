@@ -652,3 +652,22 @@ func TestRuntimeErrorWithUsageWordsExitsAPI(t *testing.T) {
 		t.Fatalf("exit = %d, want %d (stderr=%q)", code, rungrad.ExitAPI, errb.String())
 	}
 }
+
+func TestFactoryChooserHonoursTerminalSettings(t *testing.T) {
+	f := &rungrad.Factory{Flags: &rungrad.GlobalFlags{NoANSI: true}}
+	if c := f.Chooser(); !c.Plain || !c.NoColor {
+		t.Fatalf("--no-ansi must force plain line mode without colour: %+v", c)
+	}
+	f = &rungrad.Factory{Flags: &rungrad.GlobalFlags{NoColor: true}}
+	if c := f.Chooser(); c.Plain || !c.NoColor {
+		t.Fatalf("--no-color keeps the menu but drops colour: %+v", c)
+	}
+	t.Setenv("NO_COLOR", "1")
+	f = &rungrad.Factory{Flags: &rungrad.GlobalFlags{}}
+	if c := f.Chooser(); !c.NoColor {
+		t.Fatalf("NO_COLOR must drop colour: %+v", c)
+	}
+	if f.Chooser().Transform == nil {
+		t.Fatal("chooser output must be redacted")
+	}
+}

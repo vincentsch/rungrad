@@ -558,10 +558,14 @@ type ConfirmOptions struct {
 //   - in non-interactive mode (machine output, --no-prompt, or no terminal) it
 //     never reads stdin and returns a usage error, so an automated caller can
 //     never block;
-//   - otherwise it writes a prompt to stderr (not through Infof, so --quiet cannot
-//     hide a blocking prompt) and proceeds only on a case-insensitive y or yes.
+//   - otherwise it asks on stderr (not through Infof, so --quiet cannot hide a
+//     blocking prompt) with two answers, "Yes, continue" and "No, cancel", with
+//     "No, cancel" preselected. On a terminal the user must move to "Yes" and
+//     press Enter; in line mode the answer must be exactly 1, y, yes or the full
+//     label. A partial or unrelated answer asks again.
 //
-// Decline, empty, EOF, or an unrecognized response returns a usage error.
+// Choosing "No, cancel", a blank answer, Ctrl-C, q, or end of input returns a
+// usage error and performs nothing.
 func (f *Factory) ConfirmDestructive(opts ConfirmOptions) error {
 	if f.DryRun() {
 		return nil
@@ -573,13 +577,7 @@ func (f *Factory) ConfirmDestructive(opts ConfirmOptions) error {
 	if f.machineOutput() || noPrompt || !f.promptInteractive() {
 		return NewError(ExitUsage, "destructive action requires --confirm")
 	}
-	chooser := choose.Chooser{
-		In:        f.Stdin,
-		Out:       f.Stderr,
-		Plain:     f.Flags != nil && f.Flags.NoANSI,
-		Transform: f.redactString,
-	}
-	ok, err := chooser.Confirm(
+	ok, err := f.Chooser().Confirm(
 		fmt.Sprintf("About to %s %s.", opts.Action, opts.Target),
 		"Yes, continue",
 		"No, cancel",
@@ -588,6 +586,29 @@ func (f *Factory) ConfirmDestructive(opts ConfirmOptions) error {
 		return NewError(ExitUsage, "destructive action declined")
 	}
 	return nil
+}
+
+// CanPrompt reports whether the command may ask an interactive question:
+// not under machine output or --no-prompt, and stdin is a terminal. Check it
+// before calling Chooser, and give the command a flag that answers the
+// question when it returns false.
+func (f *Factory) CanPrompt() bool {
+	noPrompt := f.Flags != nil && f.Flags.NoPrompt
+	return !f.machineOutput() && !noPrompt && f.promptInteractive()
+}
+
+// Chooser returns a choose.Chooser wired to this command's stdin and stderr,
+// with redaction applied to everything it prints and the --no-ansi,
+// --no-color and NO_COLOR settings honoured.
+func (f *Factory) Chooser() choose.Chooser {
+	_, noColorEnv := os.LookupEnv("NO_COLOR")
+	return choose.Chooser{
+		In:        f.Stdin,
+		Out:       f.Stderr,
+		Plain:     f.Flags != nil && f.Flags.NoANSI,
+		NoColor:   noColorEnv || (f.Flags != nil && (f.Flags.NoColor || f.Flags.NoANSI)),
+		Transform: f.redactString,
+	}
 }
 
 // Resolve resolves a name to an identifier using the tool's lookup, wiring the
