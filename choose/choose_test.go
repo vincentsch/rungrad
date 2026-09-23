@@ -24,21 +24,29 @@ func TestLineModeAcceptsNumbersFullLabelsAndBlankDefault(t *testing.T) {
 	}
 }
 
-func TestLineModeRejectsPartialAnswersAndPastedText(t *testing.T) {
-	// A partial label or an unrelated pasted line must ask again, and end of
-	// input then cancels instead of choosing anything.
-	for _, input := range []string{"l\n", "keep\n", "unspar project list\n", "ye\n"} {
+func TestLineModeRejectsPartialAnswersPastedTextAndOddNumbers(t *testing.T) {
+	// Anything that is not exactly an answer asks again; end of input then
+	// cancels instead of choosing.
+	for _, input := range []string{"l\n", "keep\n", "unspar project list\n", "ye\n", "01\n", "+1\n", "y"} {
 		_, err := Chooser{In: strings.NewReader(input), Out: &bytes.Buffer{}}.Choose("Q?", loginOptions, 1)
 		if !errors.Is(err, ErrCanceled) {
-			t.Fatalf("input %q: want ErrCanceled after re-asking, got %v", input, err)
+			t.Fatalf("input %q: want ErrCanceled, got %v", input, err)
 		}
 	}
 }
 
-func TestLineModeEOFCancels(t *testing.T) {
-	_, err := Chooser{In: strings.NewReader(""), Out: &bytes.Buffer{}}.Choose("Q?", []Option{{Label: "a"}}, 0)
+func TestLineModeQCancels(t *testing.T) {
+	_, err := Chooser{In: strings.NewReader("q\n1\n"), Out: &bytes.Buffer{}}.Choose("Q?", loginOptions, 1)
 	if !errors.Is(err, ErrCanceled) {
-		t.Fatalf("want ErrCanceled, got %v", err)
+		t.Fatalf("q must cancel, got %v", err)
+	}
+}
+
+func TestInvalidDefaultIsAnError(t *testing.T) {
+	for _, def := range []int{-1, 2} {
+		if _, err := (Chooser{In: strings.NewReader("\n"), Out: &bytes.Buffer{}}).Choose("Q?", loginOptions, def); err == nil {
+			t.Fatalf("default %d should be rejected", def)
+		}
 	}
 }
 
@@ -68,91 +76,95 @@ func TestUnwritableQuestionIsNotAnswered(t *testing.T) {
 	}
 }
 
-// run feeds keys to the raw-mode state machine exactly as chooseRaw does.
-func run(t *testing.T, input string, options []Option, def int) model {
-	t.Helper()
-	r := newKeyReader(strings.NewReader(input))
-	m := model{cursor: def, count: len(options)}
-	for !m.chosen && !m.canceled {
-		k, raw, err := r.next()
-		if err != nil {
-			return m
-		}
-		if k == keyNone {
-			if idx, ok := aliasKey(raw, options); ok {
-				k = keyDigit1 + key(idx)
+// menu drives decide, the exact loop chooseRaw runs, from Confirm's options
+// with "No" preselected.
+func menu(input string) (model, error) {
+	return decide(newKeyReader(strings.NewReader(input)), model{cursor: 1, count: 2}, nil)
+}
+
+func TestMenuTypedOrPastedTextCanOnlyPickTheSafeDefault(t *testing.T) {
+	lines := []string{
+		"cd ~/work\r", "make\r", "ls -1\r", "git log -1\r", "docker ps\r", "history\r",
+		"kubectl get pods\r", "yes\r", "y\r", "1\r", "jjkk\r", "unspar project list\n",
+		strings.Repeat("kyk1", 5000) + "\r", // far beyond any typeahead drain
+	}
+	for _, input := range lines {
+		m, err := menu(input)
+		if err != nil || !m.chosen || m.cursor != 1 {
+			name := input
+			if len(name) > 40 {
+				name = name[:40] + "..."
 			}
-		}
-		m = m.step(k)
-	}
-	return m
-}
-
-var yesNo = []Option{{Label: "Yes", Aliases: []string{"y"}}, {Label: "No", Aliases: []string{"n"}}}
-
-func TestRawModeOnlyEnterChooses(t *testing.T) {
-	for _, input := range []string{"1", "y", "k", "\x1b[A", "2y1"} {
-		if m := run(t, input, yesNo, 1); m.chosen {
-			t.Fatalf("input %q chose without Enter: %+v", input, m)
-		}
-	}
-	if m := run(t, "y\r", yesNo, 1); !m.chosen || m.cursor != 0 {
-		t.Fatalf("y then Enter should choose Yes: %+v", m)
-	}
-	if m := run(t, "\r", yesNo, 1); !m.chosen || m.cursor != 1 {
-		t.Fatalf("Enter alone should keep the safe default: %+v", m)
-	}
-}
-
-func TestRawModeHighlightDoesNotWrap(t *testing.T) {
-	if m := run(t, "j\r", yesNo, 1); m.cursor != 1 {
-		t.Fatalf("j at the last option must stay there, got cursor %d", m.cursor)
-	}
-	if m := run(t, "kk\r", yesNo, 1); m.cursor != 0 {
-		t.Fatalf("k past the top must stop at 0, got %d", m.cursor)
-	}
-}
-
-func TestRawModeSwallowsWholeEscapeSequences(t *testing.T) {
-	sequences := map[string]string{
-		"F10 xterm":        "\x1b[21~",
-		"F1 rxvt":          "\x1b[11~",
-		"F5":               "\x1b[15~",
-		"shift down":       "\x1b[1;2B",
-		"ctrl up":          "\x1b[1;5A",
-		"bracketed paste":  "\x1b[200~yes\r\x1b[A\r\x1b[201~",
-		"page up":          "\x1b[5~",
-		"ss3 F1":           "\x1bOP",
-		"delete":           "\x1b[3~",
-		"lone esc then n":  "\x1bn",
-		"lone esc then up": "\x1b\x1b[A",
-	}
-	for name, seq := range sequences {
-		m := run(t, seq+"\r", yesNo, 1)
-		want := 1
-		switch name {
-		case "lone esc then up":
-			want = 0
-		}
-		if !m.chosen || m.cursor != want {
-			t.Fatalf("%s: highlight %d chosen %v, want %d", name, m.cursor, m.chosen, want)
+			t.Fatalf("%q: chosen=%v cursor=%d err=%v; typed text must only ever pick the default", name, m.chosen, m.cursor, err)
 		}
 	}
 }
 
-func TestRawModeCancelKeys(t *testing.T) {
+func TestMenuArrowsThenEnterChoose(t *testing.T) {
+	if m, _ := menu("\x1b[A\r"); !m.chosen || m.cursor != 0 {
+		t.Fatalf("Up then Enter should choose the first answer: %+v", m)
+	}
+	if m, _ := menu("\x1bOA\r"); !m.chosen || m.cursor != 0 {
+		t.Fatalf("SS3 Up then Enter should choose the first answer: %+v", m)
+	}
+	if m, _ := menu("\x1b[B\x1b[B\r"); m.cursor != 1 {
+		t.Fatalf("Down at the last option must stay there: %+v", m)
+	}
+	if m, _ := menu("\x1b[A\x1b[A\x1b[A\r"); m.cursor != 0 {
+		t.Fatalf("Up past the top must stop at 0: %+v", m)
+	}
+}
+
+func TestMenuSwallowsWholeEscapeSequences(t *testing.T) {
+	for name, seq := range map[string]string{
+		"F10 xterm":             "\x1b[21~",
+		"F1 rxvt":               "\x1b[11~",
+		"shift F-key rxvt ($)":  "\x1b[23$",
+		"shift up":              "\x1b[1;2A",
+		"ctrl up":               "\x1b[1;5A",
+		"bracketed paste":       "\x1b[200~\x1b[Ayes\r\x1b[201~",
+		"paste with fake end":   "\x1b[200~x\x1b[201\x1b[A\r\x1b[201~",
+		"page up":               "\x1b[5~",
+		"ss3 F1":                "\x1bOP",
+		"lone esc then y":       "\x1by",
+		"malformed csi then up": "\x1b[1\x01",
+	} {
+		m, err := menu(seq + "\r")
+		if err != nil || !m.chosen || m.cursor != 1 {
+			t.Fatalf("%s: chosen=%v cursor=%d err=%v", name, m.chosen, m.cursor, err)
+		}
+	}
+	// A malformed sequence must not swallow a following Enter or Ctrl-C.
+	if m, _ := menu("\x1b[1\r"); !m.chosen {
+		t.Fatal("Enter after a truncated CSI was swallowed")
+	}
+	if m, _ := menu("\x1b[23$\x03"); !m.canceled {
+		t.Fatal("Ctrl-C after an rxvt shifted F-key was swallowed")
+	}
+}
+
+func TestMenuCancelKeysAndEndOfInput(t *testing.T) {
 	for _, input := range []string{"q", "\x03", "\x04"} {
-		if m := run(t, input, yesNo, 1); !m.canceled {
+		if m, _ := menu(input); !m.canceled {
 			t.Fatalf("%q should cancel", input)
 		}
 	}
+	if _, err := menu(""); !errors.Is(err, io.EOF) {
+		t.Fatalf("end of input should surface as EOF for chooseRaw to cancel, got %v", err)
+	}
 }
 
-func TestWrappedRowsCountsLongLines(t *testing.T) {
+func TestWrappedRowsCountsDisplayColumns(t *testing.T) {
 	if got := wrappedRows(strings.Repeat("x", 81), 80); got != 2 {
 		t.Fatalf("81 chars at 80 cols = %d rows, want 2", got)
 	}
 	if got := wrappedRows("\x1b[1m"+strings.Repeat("x", 80)+"\x1b[0m", 80); got != 1 {
 		t.Fatalf("escape codes must not count toward width, got %d", got)
+	}
+	if got := wrappedRows(strings.Repeat("語", 41), 80); got != 2 {
+		t.Fatalf("41 wide characters take 82 columns = 2 rows, got %d", got)
+	}
+	if got := oneLine("a\nb\tc\x07d"); got != "a b cd" {
+		t.Fatalf("oneLine = %q", got)
 	}
 }

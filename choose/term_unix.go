@@ -34,19 +34,28 @@ func restoreOnSignal(restore func()) (stop func()) {
 	ch := make(chan os.Signal, 1)
 	done := make(chan struct{})
 	signal.Notify(ch, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGINT)
+	raise := func(sig os.Signal) {
+		restore()
+		signal.Reset(sig)
+		if s, ok := sig.(syscall.Signal); ok {
+			_ = syscall.Kill(os.Getpid(), s)
+		}
+	}
 	go func() {
 		select {
 		case sig := <-ch:
-			restore()
-			signal.Reset(sig)
-			if s, ok := sig.(syscall.Signal); ok {
-				_ = syscall.Kill(os.Getpid(), s)
-			}
+			raise(sig)
 		case <-done:
 		}
 	}()
 	return func() {
 		signal.Stop(ch)
 		close(done)
+		// A signal that arrived while stopping must not be lost.
+		select {
+		case sig := <-ch:
+			raise(sig)
+		default:
+		}
 	}
 }

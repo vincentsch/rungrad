@@ -560,12 +560,12 @@ standard JSON error on stderr under `--json`.
 ## Asking a question
 
 For any other interactive choice, use the factory's chooser instead of
-printing `[y/N]` yourself. On a real terminal the user moves the highlight with
-the arrow keys (or `j`/`k`, a number, or `y`/`n`) and must press Enter to
-choose, so a stray key, a function key or pasted text never picks an answer.
-Everywhere else (pipes, tests, `TERM=dumb`, Windows consoles, `--no-ansi`) the
-same question renders as a numbered list that accepts only an option number, a
-full label, or `y`/`yes`/`n`/`no`.
+printing `[y/N]` yourself. On a real terminal only the up and down arrow keys
+move the highlight and Enter chooses, so anything typed or pasted, newline
+included, can only pick the preselected answer. Everywhere else (pipes, tests,
+`TERM=dumb`, Windows consoles, `--no-ansi`) the same question renders as a
+numbered list that accepts only an option number, a full label, or
+`y`/`yes`/`n`/`no`, followed by Enter.
 
 ```go
 if !f.CanPrompt() {
@@ -577,8 +577,8 @@ ok, err := f.Chooser().Confirm(
 
 `f.Chooser()` redacts everything it prints and honours `--no-ansi`,
 `--no-color` and `NO_COLOR`. Write answers as plain actions a user would say out
-loud, never internal ids. The second answer is preselected, so make it the safe
-one. Always check `f.CanPrompt()` first and give the command a flag that answers
+loud, never internal ids. For `Confirm` the second answer is preselected, and
+for `Choose` you pass the preselected index; either way make it the safe one. Always check `f.CanPrompt()` first and give the command a flag that answers
 the question for automation.
 
 ## Name resolution

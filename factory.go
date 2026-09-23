@@ -560,12 +560,14 @@ type ConfirmOptions struct {
 //     never block;
 //   - otherwise it asks on stderr (not through Infof, so --quiet cannot hide a
 //     blocking prompt) with two answers, "Yes, continue" and "No, cancel", with
-//     "No, cancel" preselected. On a terminal the user must move to "Yes" and
-//     press Enter; in line mode the answer must be exactly 1, y, yes or the full
-//     label. A partial or unrelated answer asks again.
+//     "No, cancel" preselected. On a terminal only the up and down arrows move
+//     the highlight and Enter confirms, so typed or pasted text can only pick
+//     "No, cancel"; in line mode the answer must be exactly 1, y, yes or the
+//     full label followed by Enter, and anything else asks again.
 //
-// Choosing "No, cancel", a blank answer, Ctrl-C, q, or end of input returns a
-// usage error and performs nothing.
+// Choosing "No, cancel", a blank answer, q, Ctrl-C or Ctrl-D in the menu, or
+// end of input returns a usage error and performs nothing. In line mode Ctrl-C
+// is an ordinary SIGINT.
 func (f *Factory) ConfirmDestructive(opts ConfirmOptions) error {
 	if f.DryRun() {
 		return nil
@@ -601,7 +603,7 @@ func (f *Factory) CanPrompt() bool {
 // with redaction applied to everything it prints and the --no-ansi,
 // --no-color and NO_COLOR settings honoured.
 func (f *Factory) Chooser() choose.Chooser {
-	_, noColorEnv := os.LookupEnv("NO_COLOR")
+	_, noColorEnv := f.lookupEnv("NO_COLOR")
 	return choose.Chooser{
 		In:        f.Stdin,
 		Out:       f.Stderr,

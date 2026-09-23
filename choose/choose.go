@@ -1,11 +1,16 @@
 // Package choose renders an interactive single-choice question.
 //
-// On a real terminal the user moves the highlight with the arrow keys (or j/k,
-// a digit, or an option's one-letter alias) and confirms with Enter. Nothing is
-// ever chosen without Enter, so a stray keypress, a function key or pasted text
-// cannot pick an answer. Anywhere raw input is not available (pipes, tests,
-// TERM=dumb, Windows consoles, callers that set Plain) the same question is
-// rendered as a numbered list read line by line.
+// On a real terminal the user moves the highlight with the up and down arrow
+// keys and confirms with Enter. No other key moves it, so typed or pasted text,
+// including its newline, can only ever pick the preselected answer; callers
+// should preselect the safe one. Anywhere raw input is not available (pipes,
+// tests, TERM=dumb, Windows consoles, callers that set Plain) the same question
+// is rendered as a numbered list that accepts only an option number, an alias
+// or a full label, followed by Enter.
+//
+// While the arrow-key menu is open, SIGTERM, SIGHUP, SIGQUIT and SIGINT restore
+// the terminal and are then re-raised with their default behaviour, which takes
+// precedence over handlers the application installed for those signals.
 //
 // Choose never decides whether a prompt is allowed. Commands must still check
 // their non-interactive policy first and offer a flag that answers the
@@ -21,19 +26,18 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"golang.org/x/term"
 )
 
-// ErrCanceled reports that the user backed out (q, Ctrl-C, Ctrl-D) or that
-// input ended before an answer was given.
+// ErrCanceled reports that the user backed out (q, or Ctrl-C and Ctrl-D in the
+// arrow-key menu) or that input ended before an answer was given. In line mode
+// Ctrl-C is an ordinary SIGINT.
 var ErrCanceled = errors.New("choice canceled")
 
 // Option is one answer. Hint is an optional short explanation shown dimmed.
 // Aliases are extra answers accepted when typed in full in line mode, such as
-// "y" or "no"; in the arrow-key menu a one-character alias moves the highlight
-// to its option (Enter still confirms).
+// "y" or "no". The arrow-key menu ignores them on purpose.
 type Option struct {
 	Label   string
 	Hint    string
@@ -56,13 +60,14 @@ type Chooser struct {
 }
 
 // Choose asks question and returns the index of the selected option. def is
-// the option highlighted first and the answer for a blank line in line mode.
+// the option preselected in the menu and the answer for a blank line in line
+// mode; it must be a valid index, and should be the safe answer.
 func (c Chooser) Choose(question string, options []Option, def int) (int, error) {
 	if len(options) == 0 {
 		return 0, errors.New("choose: no options provided")
 	}
 	if def < 0 || def >= len(options) {
-		def = 0
+		return 0, fmt.Errorf("choose: default %d is not one of the %d options", def, len(options))
 	}
 	if in, out, ok := c.rawCapable(); ok {
 		return c.chooseRaw(in, out, question, options, def)
@@ -140,6 +145,9 @@ func (c Chooser) chooseLines(question string, options []Option, def int) (int, e
 		if answer == "" {
 			return def, nil
 		}
+		if strings.EqualFold(answer, "q") && !isAnswer(answer, options) {
+			return 0, ErrCanceled
+		}
 		if idx, ok := matchAnswer(answer, options); ok {
 			return idx, nil
 		}
@@ -150,7 +158,7 @@ func (c Chooser) chooseLines(question string, options []Option, def int) (int, e
 // case-insensitively. Partial labels are deliberately not accepted.
 func matchAnswer(answer string, options []Option) (int, bool) {
 	if n, err := strconv.Atoi(answer); err == nil {
-		if n >= 1 && n <= len(options) {
+		if n >= 1 && n <= len(options) && strconv.Itoa(n) == answer {
 			return n - 1, true
 		}
 		return 0, false
@@ -168,6 +176,22 @@ func matchAnswer(answer string, options []Option) (int, bool) {
 	return 0, false
 }
 
+// isAnswer reports whether text is a label or alias, so a literal "q" option
+// is not mistaken for cancel.
+func isAnswer(text string, options []Option) bool {
+	for _, opt := range options {
+		if strings.EqualFold(opt.Label, text) {
+			return true
+		}
+		for _, alias := range opt.Aliases {
+			if strings.EqualFold(alias, text) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (c Chooser) chooseRaw(inFD, outFD int, question string, options []Option, def int) (int, error) {
 	state, err := term.MakeRaw(inFD)
 	if err != nil {
@@ -177,9 +201,13 @@ func (c Chooser) chooseRaw(inFD, outFD int, question string, options []Option, d
 		term.Restore(inFD, state)
 		fmt.Fprint(c.Out, "\x1b[?2004l\x1b[?25h") // bracketed paste off, cursor on
 	}
-	defer restore()
 	stopSignals := restoreOnSignal(restore)
-	defer stopSignals()
+	// Restore before the signal watcher stops, so a signal landing in between
+	// still finds the terminal back in its normal state.
+	defer func() {
+		restore()
+		stopSignals()
+	}()
 
 	// Anything typed or pasted before the menu appeared is not an answer.
 	discardPendingInput(inFD)
@@ -200,35 +228,45 @@ func (c Chooser) chooseRaw(inFD, outFD int, question string, options []Option, d
 	if err != nil {
 		return 0, fmt.Errorf("write choice prompt: %w", err)
 	}
-	keys := newKeyReader(c.In)
-	for {
-		k, raw, err := keys.next()
-		if err != nil {
-			c.clear(rows)
-			if errors.Is(err, io.EOF) {
-				return 0, ErrCanceled
-			}
-			return 0, err
-		}
-		if k == keyNone {
-			if idx, ok := aliasKey(raw, options); ok {
-				k = keyDigit1 + key(idx)
-			}
-		}
-		m = m.step(k)
-		switch {
-		case m.canceled:
-			c.clear(rows)
-			fmt.Fprint(c.Out, c.text(question)+" "+c.dim("canceled")+"\r\n")
-			return 0, ErrCanceled
-		case m.chosen:
-			c.clear(rows)
-			fmt.Fprint(c.Out, c.text(question)+" "+c.bold(c.text(options[m.cursor].Label))+"\r\n")
-			return m.cursor, nil
-		}
+	var redrawErr error
+	m, err = decide(newKeyReader(c.In), m, func(m model) {
 		c.clear(rows)
-		if rows, err = c.render(question, options, m.cursor, width()); err != nil {
-			return 0, fmt.Errorf("write choice prompt: %w", err)
+		if rows, redrawErr = c.render(question, options, m.cursor, width()); redrawErr != nil {
+			redrawErr = fmt.Errorf("write choice prompt: %w", redrawErr)
+		}
+	})
+	c.clear(rows)
+	switch {
+	case redrawErr != nil:
+		return 0, redrawErr
+	case err != nil && errors.Is(err, io.EOF):
+		return 0, ErrCanceled
+	case err != nil:
+		return 0, err
+	case m.canceled:
+		fmt.Fprint(c.Out, c.text(question)+" "+c.dim("canceled")+"\r\n")
+		return 0, ErrCanceled
+	}
+	fmt.Fprint(c.Out, c.text(question)+" "+c.bold(c.text(options[m.cursor].Label))+"\r\n")
+	return m.cursor, nil
+}
+
+// decide runs the arrow-key menu until the user chooses or cancels, calling
+// redraw after every change of highlight. It is the loop chooseRaw runs, kept
+// free of terminal setup so tests drive exactly the shipped behaviour.
+func decide(keys *keyReader, m model, redraw func(model)) (model, error) {
+	for {
+		k, err := keys.next()
+		if err != nil {
+			return m, err
+		}
+		before := m.cursor
+		m = m.step(k)
+		if m.chosen || m.canceled {
+			return m, nil
+		}
+		if m.cursor != before && redraw != nil {
+			redraw(m)
 		}
 	}
 }
@@ -251,9 +289,9 @@ func (c Chooser) dim(s string) string {
 // counting wrapped lines, so the next frame can erase exactly that many.
 // Raw mode needs explicit carriage returns.
 func (c Chooser) render(question string, options []Option, cursor, width int) (int, error) {
-	lines := []string{c.text(question)}
+	lines := []string{oneLine(c.text(question))}
 	for i, opt := range options {
-		marker, label := "  ", c.text(opt.Label)
+		marker, label := "  ", oneLine(c.text(opt.Label))
 		if i == cursor {
 			marker = "> "
 			if !c.NoColor {
@@ -263,7 +301,7 @@ func (c Chooser) render(question string, options []Option, cursor, width int) (i
 		}
 		line := marker + label
 		if opt.Hint != "" {
-			line += "  " + c.dim(c.text(opt.Hint))
+			line += "  " + c.dim(oneLine(c.text(opt.Hint)))
 		}
 		lines = append(lines, line)
 	}
@@ -283,11 +321,44 @@ var ansiSequence = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
 
 // wrappedRows reports how many terminal rows a line occupies at width columns.
 func wrappedRows(line string, width int) int {
-	n := utf8.RuneCountInString(ansiSequence.ReplaceAllString(line, ""))
+	n := displayWidth(ansiSequence.ReplaceAllString(line, ""))
 	if width <= 0 || n <= width {
 		return 1
 	}
 	return (n + width - 1) / width
+}
+
+// displayWidth approximates terminal columns: East Asian wide characters and
+// emoji take two, combining marks none.
+func displayWidth(s string) int {
+	w := 0
+	for _, r := range s {
+		switch {
+		case r >= 0x0300 && r <= 0x036f, r == 0x200d, r >= 0xfe00 && r <= 0xfe0f:
+		case r >= 0x1100 && r <= 0x115f, r >= 0x2e80 && r <= 0xa4cf, r >= 0xac00 && r <= 0xd7a3,
+			r >= 0xf900 && r <= 0xfaff, r >= 0xfe30 && r <= 0xfe4f, r >= 0xff00 && r <= 0xff60,
+			r >= 0xffe0 && r <= 0xffe6, r >= 0x1f300 && r <= 0x1f64f, r >= 0x1f900 && r <= 0x1f9ff,
+			r >= 0x20000 && r <= 0x3fffd:
+			w += 2
+		default:
+			w++
+		}
+	}
+	return w
+}
+
+// oneLine keeps menu text on a single row so the redraw count stays exact:
+// line breaks and tabs become spaces and other control characters are dropped.
+func oneLine(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r == '\n' || r == '\r' || r == '\t':
+			return ' '
+		case r < 0x20 || r == 0x7f:
+			return -1
+		}
+		return r
+	}, s)
 }
 
 func (c Chooser) clear(rows int) {
@@ -305,12 +376,10 @@ const (
 	keyDown
 	keyEnter
 	keyCancel
-	keyDigit1 // keyDigit1 + n moves the highlight to option n+1
 )
 
-// model is the pure selection state, kept separate from terminal I/O so it can
-// be tested without a TTY. Only Enter chooses; every other key only moves the
-// highlight, and the highlight stops at the ends instead of wrapping.
+// model is the pure selection state. Only Enter chooses; only the up and down
+// arrows move the highlight, which stops at the ends instead of wrapping.
 type model struct {
 	cursor   int
 	count    int
@@ -332,10 +401,6 @@ func (m model) step(k key) model {
 		m.chosen = true
 	case k == keyCancel:
 		m.canceled = true
-	case k >= keyDigit1:
-		if n := int(k - keyDigit1); n < m.count {
-			m.cursor = n
-		}
 	}
 	return m
 }
@@ -367,35 +432,29 @@ func (r *keyReader) byte() (byte, error) {
 
 func (r *keyReader) unread(b byte) { r.pending = append([]byte{b}, r.pending...) }
 
-// next decodes one key and also returns the byte that started it, so callers
-// can map plain letters to option aliases.
-func (r *keyReader) next() (key, byte, error) {
+// next decodes one key. Only Enter, the cancel keys and the up and down arrows
+// mean anything; every other byte is ignored.
+func (r *keyReader) next() (key, error) {
 	b, err := r.byte()
 	if err != nil {
-		return keyNone, 0, err
+		return keyNone, err
 	}
 	switch b {
 	case '\r', '\n':
-		return keyEnter, b, nil
+		return keyEnter, nil
 	case 3, 4, 'q', 'Q': // Ctrl-C, Ctrl-D
-		return keyCancel, b, nil
-	case 'k', 'K':
-		return keyUp, b, nil
-	case 'j', 'J':
-		return keyDown, b, nil
+		return keyCancel, nil
 	case 0x1b:
-		k, err := r.escape()
-		return k, b, err
+		return r.escape()
 	}
-	if b >= '1' && b <= '9' {
-		return keyDigit1 + key(b-'1'), b, nil
-	}
-	return keyNone, b, nil
+	return keyNone, nil
 }
 
-// escape consumes a whole escape sequence so none of its bytes are read as
-// separate keys: CSI (ESC [ params final), SS3 (ESC O x), or ESC followed by an
-// unrelated byte, which is put back. Only plain up and down arrows move.
+// escape consumes an escape sequence so none of its bytes are read as separate
+// keys: CSI (ESC [ parameters intermediates final), SS3 (ESC O x), or ESC
+// followed by an unrelated byte, which is put back. A byte that cannot belong
+// to a CSI sequence ends it and is put back too, so Enter or Ctrl-C after a
+// malformed sequence still counts. Only plain up and down arrows move.
 func (r *keyReader) escape() (key, error) {
 	second, err := r.byte()
 	if err != nil {
@@ -407,6 +466,10 @@ func (r *keyReader) escape() (key, error) {
 		if err != nil {
 			return keyNone, err
 		}
+		if third < 0x20 {
+			r.unread(third)
+			return keyNone, nil
+		}
 		return arrow(third, ""), nil
 	case '[':
 		var params []byte
@@ -415,14 +478,16 @@ func (r *keyReader) escape() (key, error) {
 			if err != nil {
 				return keyNone, err
 			}
-			if b >= 0x40 && b <= 0x7e { // final byte
+			switch {
+			case b >= 0x40 && b <= 0x7e: // final byte
 				if b == '~' && string(params) == "200" {
 					return keyNone, r.skipPaste()
 				}
 				return arrow(b, string(params)), nil
-			}
-			params = append(params, b)
-			if len(params) > 16 { // not a sequence we understand; stop eating
+			case b >= 0x20 && b <= 0x3f && len(params) < 16: // parameters, intermediates
+				params = append(params, b)
+			default:
+				r.unread(b)
 				return keyNone, nil
 			}
 		}
@@ -470,19 +535,6 @@ func arrow(final byte, params string) key {
 	return keyNone
 }
 
-// aliasKey maps a single keypress to the option whose one-character alias it
-// is, for example y and n in a yes/no question. It only moves the highlight.
-func aliasKey(b byte, options []Option) (int, bool) {
-	for i, opt := range options {
-		for _, alias := range opt.Aliases {
-			if len(alias) == 1 && strings.EqualFold(alias, string(b)) {
-				return i, true
-			}
-		}
-	}
-	return 0, false
-}
-
 func readLine(in io.Reader) (string, error) {
 	var buf []byte
 	var one [1]byte
@@ -495,9 +547,8 @@ func readLine(in io.Reader) (string, error) {
 			buf = append(buf, one[0])
 		}
 		if err != nil {
-			if errors.Is(err, io.EOF) && len(buf) > 0 {
-				return strings.TrimSuffix(string(buf), "\r"), nil
-			}
+			// A line without Enter (for example "y" then Ctrl-D) is not an
+			// answer; end of input cancels.
 			return "", err
 		}
 	}
