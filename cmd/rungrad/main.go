@@ -17,7 +17,7 @@ import (
 	"github.com/vincentsch/rungrad/scaffold"
 )
 
-const version = "v0.3.1"
+const version = "v0.3.2"
 
 func fields(s string) []string {
 	s = strings.TrimSpace(s)
