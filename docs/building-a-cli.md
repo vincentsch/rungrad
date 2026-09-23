@@ -550,11 +550,29 @@ For destructive actions, mark the command `Destructive: true`, register a local
 ```
 
 `ConfirmDestructive` is safe in every mode: under `--dry-run` it returns without
-prompting; with `--confirm` it proceeds; on a terminal it prompts on stderr and
-proceeds only on `y`/`yes`; and under machine output (`--json`, `--jq`, or
+prompting; with `--confirm` it proceeds; on a terminal it asks on stderr with
+two labelled choices, "Yes, continue" and "No, cancel", highlighting the safe one
+so a bare Enter never deletes anything; and under machine output (`--json`, `--jq`, or
 `--template`), `--no-prompt`, or no terminal it refuses with the usage exit code
 (1) instead of blocking, so an agent is never stuck. The refusal body is the
 standard JSON error on stderr under `--json`.
+
+## Asking a question
+
+For any other interactive choice, use the `choose` package instead of printing
+`[y/N]` yourself. On a real terminal the user moves with the arrow keys (or
+`j`/`k`) and presses Enter, or types the option number; everywhere else (pipes,
+tests, `TERM=dumb`, Windows consoles, `--no-ansi`) the same question renders as
+a numbered list, and typing the start of a label such as `y` still works.
+
+```go
+ok, err := choose.Chooser{In: f.Stdin, Out: f.Stderr, Plain: f.Flags.NoANSI}.
+    Confirm("You are already logged in to Acme. Log in again?", "Log in again", "Keep the current login")
+```
+
+Write options as plain actions a user would say out loud, never internal ids.
+`choose` does not decide whether asking is allowed: check non-interactive mode
+first and give the command a flag that answers the question for automation.
 
 ## Name resolution
 

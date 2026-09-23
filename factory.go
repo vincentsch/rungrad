@@ -1,7 +1,6 @@
 package rungrad
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -12,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/vincentsch/rungrad/choose"
 	"github.com/vincentsch/rungrad/config"
 	"github.com/vincentsch/rungrad/output"
 	"github.com/vincentsch/rungrad/redact"
@@ -573,14 +573,21 @@ func (f *Factory) ConfirmDestructive(opts ConfirmOptions) error {
 	if f.machineOutput() || noPrompt || !f.promptInteractive() {
 		return NewError(ExitUsage, "destructive action requires --confirm")
 	}
-	fmt.Fprint(f.Stderr, f.redactString(fmt.Sprintf("About to %s %s. Confirm? [y/N]: ", opts.Action, opts.Target)))
-	line, _ := bufio.NewReader(f.Stdin).ReadString('\n')
-	switch strings.ToLower(strings.TrimSpace(line)) {
-	case "y", "yes":
-		return nil
-	default:
+	chooser := choose.Chooser{
+		In:        f.Stdin,
+		Out:       f.Stderr,
+		Plain:     f.Flags != nil && f.Flags.NoANSI,
+		Transform: f.redactString,
+	}
+	ok, err := chooser.Confirm(
+		fmt.Sprintf("About to %s %s.", opts.Action, opts.Target),
+		"Yes, continue",
+		"No, cancel",
+	)
+	if err != nil || !ok {
 		return NewError(ExitUsage, "destructive action declined")
 	}
+	return nil
 }
 
 // Resolve resolves a name to an identifier using the tool's lookup, wiring the

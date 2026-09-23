@@ -459,7 +459,7 @@ func TestConfirmDestructiveNonInteractiveRefusesWithoutReadingStdin(t *testing.T
 }
 
 func TestConfirmDestructiveInteractiveAccepts(t *testing.T) {
-	for _, answer := range []string{"y\n", "yes\n", "Y\n", "YES\n"} {
+	for _, answer := range []string{"y\n", "yes\n", "Y\n", "YES\n", "1\n"} {
 		res := testutil.RunWith(demoApp(), testutil.Options{
 			Stdin:       strings.NewReader(answer),
 			Terminal:    true,
@@ -471,6 +471,25 @@ func TestConfirmDestructiveInteractiveAccepts(t *testing.T) {
 		if !strings.Contains(res.Stdout, "Deleted") {
 			t.Fatalf("answer %q: missing deletion report: %q", answer, res.Stdout)
 		}
+	}
+}
+
+func TestConfirmDestructiveOffersLabelledChoicesAndBlankIsSafe(t *testing.T) {
+	res := testutil.RunWith(demoApp(), testutil.Options{
+		Stdin:       strings.NewReader("\n"),
+		Terminal:    true,
+		TerminalSet: true,
+	}, "delete", "thing")
+	if res.Exit != rungrad.ExitUsage {
+		t.Fatalf("a blank answer must keep the safe default and decline: exit %d", res.Exit)
+	}
+	for _, want := range []string{"1) Yes, continue", "2) No, cancel", "Choose 1-2 [2]"} {
+		if !strings.Contains(res.Stderr, want) {
+			t.Fatalf("prompt missing %q: %q", want, res.Stderr)
+		}
+	}
+	if strings.Contains(res.Stderr, "[y/N]") {
+		t.Fatalf("old y/N prompt still rendered: %q", res.Stderr)
 	}
 }
 
