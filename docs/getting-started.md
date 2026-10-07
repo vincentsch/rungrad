@@ -17,6 +17,28 @@ Add the framework to an existing Go module:
 go get github.com/vincentsch/rungrad@v0.3.2
 ```
 
+### If your shell cannot find rungrad
+
+`go install` puts the executable in `GOBIN`, or in the first `GOPATH` entry's
+`bin` directory when `GOBIN` is empty. Check those paths with:
+
+```bash
+go env GOBIN GOPATH
+```
+
+Add the install directory to your shell's `PATH`. With the default Go settings
+on Linux or macOS, this makes it available in the current shell:
+
+```bash
+export PATH="$PATH:$(go env GOPATH)/bin"
+rungrad --help
+```
+
+If you set `GOBIN` or use multiple `GOPATH` entries, use the install directory
+from those settings instead. Add the same directory to your shell startup file
+to keep it available in new terminals. On Windows, add it to your user `Path`
+environment variable and open a new terminal.
+
 ## Scaffold a new CLI
 
 ```bash
