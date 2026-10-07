@@ -11,6 +11,36 @@ The spec stands on its own. Any CLI in any language can follow it. The rungrad
 Go framework is one implementation, and `rungrad score` checks any executable
 against the ruleset in [`ruleset.yaml`](ruleset.yaml).
 
+## Why this spec exists
+
+A script needs to know whether a command failed. It needs data it can parse and
+must not wait for someone to answer a prompt. An AI agent calling the same
+command needs those things too.
+
+A CLI framework can parse flags without defining any of that behavior. This
+spec gives CLI authors a shared set of rules for output, errors and changes.
+It also gives users something to check before depending on a tool in a script.
+
+## How to use it
+
+When building a CLI, use the sections below to decide how commands should
+behave. For example, a delete command should show a preview under `--dry-run`
+and refuse to prompt when called with `--no-prompt`. The rules apply whether
+you use rungrad, another framework, or a language other than Go.
+
+For an existing CLI, install the scorer and name a command it can read:
+
+```bash
+go install github.com/vincentsch/rungrad/cmd/rungrad@v0.3.2
+rungrad score ./mytool --read "project list"
+```
+
+Replace `project list` with a read-only command from your tool. Add fixtures
+for its other behaviors as you implement them. You can run the same checks in
+CI with `--strict` to fail when a required rule fails. Unconfigured checks are
+not-applicable, so a high score alone does not mean the whole spec was checked.
+See [conformance](../docs/conformance.md) for fixture flags and scoring limits.
+
 ## Sections
 
 1. [Output contract](output-contract.md)
