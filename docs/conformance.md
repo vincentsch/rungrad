@@ -170,6 +170,36 @@ command accepts an isolated `--config` path and still succeeds, but it cannot pr
 that target-specific config values are semantically used unless the target exposes a
 read command whose output depends on config.
 
+## Use the scorer in CI
+
+For a project generated with `rungrad new mytool`, run these commands from the
+project root after installing Go:
+
+```bash
+go install github.com/vincentsch/rungrad/cmd/rungrad@v0.3.2
+go build -o mytool .
+rungrad score ./mytool \
+  --read "widget list" \
+  --mutate "widget create demo" \
+  --destructive "widget delete alpha" \
+  --update \
+  --strict
+```
+
+The runner must have Go's install directory on `PATH`. See
+[installation troubleshooting](getting-started.md#if-your-shell-cannot-find-rungrad)
+if `rungrad` cannot be found.
+
+Replace the widget commands with your own fixtures when you replace the starter.
+Use a stub backend for fixtures that could access a live service. The starter
+uses in-memory data and its update check is offline. For a CLI written in another
+language, replace `go build` with its build command; the scorer still takes the
+path to the resulting executable.
+
+Keep the scorer version pinned so changing it is a deliberate CI update. Let a
+non-zero scorer exit status fail the job. Review the applicable-rule count too:
+`--strict` does not fail for omitted fixtures or failed recommended rules.
+
 ## Example: the reference CLI
 
 The `rgref` tool in this repository scores 100%. A test builds it and scores it
