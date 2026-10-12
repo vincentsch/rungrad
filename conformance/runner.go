@@ -3,8 +3,10 @@ package conformance
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -125,7 +127,7 @@ func resolveTargetPath(path string) (string, error) {
 	if filepath.Base(path) == path {
 		found, err := exec.LookPath(path)
 		if err != nil {
-			return "", &TargetError{Message: "target is not executable: " + path}
+			return "", &TargetError{Message: "target is not found on PATH: " + path}
 		}
 		path = found
 	}
@@ -134,8 +136,11 @@ func resolveTargetPath(path string) (string, error) {
 		return "", &TargetError{Message: "resolve target path: " + err.Error()}
 	}
 	info, err := os.Stat(abs)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", &TargetError{Message: "target does not exist: " + path}
+	}
 	if err != nil {
-		return "", &TargetError{Message: "target is not executable: " + path}
+		return "", &TargetError{Message: "cannot read target: " + err.Error()}
 	}
 	if info.IsDir() {
 		return "", &TargetError{Message: "target is a directory: " + path}
