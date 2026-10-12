@@ -40,8 +40,10 @@ Scaffold a new rungrad CLI project under `<dir>/<name>`.
 | `--docs-label <title>` | product name | README title |
 | `--example "<cmd>"` | | Extra generated command example; repeatable |
 
-The generated project builds, runs, and passes its tests. It
-refuses to overwrite an existing non-empty project directory. Product-only flags
+The generated project builds, runs, and passes its tests after `go mod tidy`,
+which fills in `go.sum` for the rungrad module. Until then `go build` and
+`go test` report a missing go.sum entry. It refuses to overwrite an existing
+non-empty project directory. Product-only flags
 require `--product-profile`; the product scaffold still uses offline widget and
 update examples and keeps release wiring as comments/docs placeholders.
 
