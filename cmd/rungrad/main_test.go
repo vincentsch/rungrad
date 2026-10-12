@@ -91,6 +91,16 @@ func TestNewInvalidNameExitsUsage(t *testing.T) {
 	}
 }
 
+func TestNewMissingNameNamesTheArgument(t *testing.T) {
+	res := testutil.Run(newApp(), "new")
+	if res.Exit != rungrad.ExitUsage {
+		t.Fatalf("missing name exit = %d, want %d (stderr=%q)", res.Exit, rungrad.ExitUsage, res.Stderr)
+	}
+	if !strings.Contains(res.Stderr, "<name>") {
+		t.Fatalf("stderr should name the missing <name> argument: %q", res.Stderr)
+	}
+}
+
 func TestNewProductProfileSkillRejectsInvalidSkillNames(t *testing.T) {
 	for _, name := range []string{"acme-", "acme--ctl", strings.Repeat("a", 65)} {
 		t.Run(name, func(t *testing.T) {
