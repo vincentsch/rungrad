@@ -3,8 +3,11 @@ Resolve an item by name or id
 Related commands:
   rgref item list
 
-Output modes:
-  human, json, jq, template
+Output:
+  Shows text you can read in your terminal.
+  Use --json to get JSON for scripts and other programs.
+  Use --jq to filter the JSON output with a jq expression.
+  Use --template to format the output with a Go template.
 
 Usage:
   rgref item get <name> [flags]

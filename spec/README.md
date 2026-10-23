@@ -31,7 +31,7 @@ you use rungrad, another framework, or a language other than Go.
 For an existing CLI, install the scorer and name a command it can read:
 
 ```bash
-go install github.com/vincentsch/rungrad/cmd/rungrad@v0.3.2
+go install github.com/vincentsch/rungrad/cmd/rungrad@v0.3.3
 rungrad score ./mytool --read "project list"
 ```
 

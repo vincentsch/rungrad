@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/vincentsch/rungrad/internal/outputhelp"
 	"github.com/vincentsch/rungrad/manifest"
 )
 
@@ -65,7 +66,7 @@ type Command struct {
 	// OutputModes documents the supported output forms, e.g. "human", "json".
 	// Advanced-output apps recognize OutputModePlain, OutputModeJQ, and
 	// OutputModeTemplate here for runtime capability checks. These tokens flow to
-	// --help, generated docs, and the manifest.
+	// the manifest; help and generated docs explain them in plain words.
 	OutputModes []string
 	// Mutates marks a command that changes state, so it is expected to honor
 	// --dry-run.
@@ -217,5 +218,5 @@ func appendOutputModesHelp(long string, modes []string) string {
 	if len(modes) == 0 {
 		return long
 	}
-	return strings.TrimRight(long, "\n") + "\n\nOutput modes:\n  " + strings.Join(modes, ", ")
+	return strings.TrimRight(long, "\n") + "\n\nOutput:\n  " + strings.Join(outputhelp.Descriptions(modes), "\n  ")
 }

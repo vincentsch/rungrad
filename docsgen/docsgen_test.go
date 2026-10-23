@@ -221,7 +221,7 @@ func TestAdvancedOutputDocsRenderFlagsModesAndRepeat(t *testing.T) {
 		}
 	}
 	page := first["rgadvanced_read.md"]
-	if !strings.Contains(page, "## Output modes\n\nhuman, json, jq, template\n") {
+	if !strings.Contains(page, "## Output\n\nShows text you can read in your terminal.\n\nUse --json to get JSON for scripts and other programs.\n\nUse --jq to filter the JSON output with a jq expression.\n\nUse --template to format the output with a Go template.\n") {
 		t.Fatalf("read page missing advanced output modes:\n%s", page)
 	}
 }
@@ -287,8 +287,8 @@ func TestCommandPageExactOutput(t *testing.T) {
 		"```\n" +
 		"rgdemo ping\n" +
 		"```\n\n" +
-		"## Output modes\n\n" +
-		"table, json\n\n" +
+		"## Output\n\n" +
+		"Shows a table in your terminal.\n\nUse --json to get JSON for scripts and other programs.\n\n" +
 		"## Related commands\n\n" +
 		"- whoami\n"
 	if got := docs["rgdemo_ping.md"]; got != want {
@@ -317,10 +317,29 @@ func TestDestructiveCommandRendersBothSections(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing delete page; got %v", keys(docs))
 	}
-	for _, want := range []string{"## Destructive", "## Changes state", "- `--confirm`"} {
+	for _, want := range []string{"## Destructive", "## Preview changes", "Use `--dry-run` to see what would change without changing anything.", "- `--confirm`"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("delete page missing %q:\n%s", want, page)
 		}
+	}
+}
+
+func TestDocsExplainOnlyDeclaredOutputAndChanges(t *testing.T) {
+	app := demoApp()
+	app.AddCommand(&rungrad.Command{Use: "export", OutputModes: []string{"csv"}})
+	docs := docsgen.Generate(app)
+	custom := docs["rgdemo_export.md"]
+	if !strings.Contains(custom, "## Output\n\nAlso supports \"csv\" output.") {
+		t.Fatalf("custom format missing from docs: %s", custom)
+	}
+	if strings.Contains(custom, "--csv") || strings.Contains(custom, "--json") {
+		t.Fatalf("docs invented an output flag: %s", custom)
+	}
+	if strings.Contains(docs["rgdemo_ping.md"], "## Preview changes") {
+		t.Fatal("read command advertised changes")
+	}
+	if strings.Contains(docs["rgdemo.md"], "## Output") {
+		t.Fatal("root without output modes advertised output")
 	}
 }
 

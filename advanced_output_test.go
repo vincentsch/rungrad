@@ -887,9 +887,9 @@ func TestAdvancedOutputHelpListsOutputModes(t *testing.T) {
 		args []string
 		want string
 	}{
-		{[]string{"read", "--help"}, "Output modes:\n  human, json, jq, template"},
-		{[]string{"copy", "--help"}, "Output modes:\n  human, json, plain"},
-		{[]string{"human", "--help"}, "Output modes:\n  human"},
+		{[]string{"read", "--help"}, "Output:\n  Shows text you can read in your terminal.\n  Use --json to get JSON for scripts and other programs.\n  Use --jq to filter the JSON output with a jq expression.\n  Use --template to format the output with a Go template."},
+		{[]string{"copy", "--help"}, "Output:\n  Shows text you can read in your terminal.\n  Use --json to get JSON for scripts and other programs.\n  Use --plain to get text without color or formatting."},
+		{[]string{"human", "--help"}, "Output:\n  Shows text you can read in your terminal."},
 	}
 	for _, tt := range tests {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
@@ -909,9 +909,23 @@ func TestOutputModesHelpIsNotAdvancedGated(t *testing.T) {
 	if res.Exit != rungrad.ExitSuccess {
 		t.Fatalf("help exit %d stderr=%q", res.Exit, res.Stderr)
 	}
-	want := "Output modes:\n  human, json, jq, template"
+	want := "Output:\n  Shows text you can read in your terminal.\n  Use --json to get JSON for scripts and other programs.\n  Use --jq to filter the JSON output with a jq expression.\n  Use --template to format the output with a Go template."
 	if !strings.Contains(res.Stdout, want) {
 		t.Fatalf("non-advanced help missing %q:\n%s", want, res.Stdout)
+	}
+}
+
+func TestHelpExplainsTableAndCustomOutputWithoutInventingFlags(t *testing.T) {
+	app := rungrad.New(rungrad.AppConfig{Name: "formats"})
+	app.AddCommand(&rungrad.Command{Use: "export", OutputModes: []string{"table", "csv"}})
+	res := testutil.Run(app, "export", "--help")
+	for _, want := range []string{"Shows a table in your terminal.", `Also supports "csv" output.`} {
+		if !strings.Contains(res.Stdout, want) {
+			t.Fatalf("help missing %q: %s", want, res.Stdout)
+		}
+	}
+	if strings.Contains(res.Stdout, "--csv") || strings.Contains(res.Stdout, "--json") {
+		t.Fatalf("help advertised an undeclared output flag: %s", res.Stdout)
 	}
 }
 

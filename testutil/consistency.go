@@ -8,6 +8,7 @@ import (
 
 	rungrad "github.com/vincentsch/rungrad"
 	"github.com/vincentsch/rungrad/docsgen"
+	"github.com/vincentsch/rungrad/internal/outputhelp"
 	"github.com/vincentsch/rungrad/manifest"
 )
 
@@ -46,12 +47,16 @@ func CheckConsistency(m manifest.Manifest, docs, help map[string]string) []strin
 				issues = append(issues, fmt.Sprintf("%s: examples missing from docs", label))
 			}
 		}
-		if modes := strings.Join(c.OutputModes, ", "); modes != "" {
-			if !strings.Contains(helpText, modes) {
+		for _, description := range outputhelp.Descriptions(c.OutputModes) {
+			if !strings.Contains(helpText, description) {
 				issues = append(issues, fmt.Sprintf("%s: output modes missing from help", label))
+				break
 			}
-			if !strings.Contains(docText, modes) {
+		}
+		for _, description := range outputhelp.Descriptions(c.OutputModes) {
+			if !strings.Contains(docText, description) {
 				issues = append(issues, fmt.Sprintf("%s: output modes missing from docs", label))
+				break
 			}
 		}
 		for _, related := range c.Related {
@@ -65,7 +70,7 @@ func CheckConsistency(m manifest.Manifest, docs, help map[string]string) []strin
 		if c.RequiresAuth && !strings.Contains(docText, "## Authentication") {
 			issues = append(issues, fmt.Sprintf("%s: authentication section missing from docs", label))
 		}
-		if c.Mutates && !strings.Contains(docText, "## Changes state") {
+		if c.Mutates && !strings.Contains(docText, "## Preview changes") {
 			issues = append(issues, fmt.Sprintf("%s: changes-state section missing from docs", label))
 		}
 		if c.Destructive && !strings.Contains(docText, "## Destructive") {

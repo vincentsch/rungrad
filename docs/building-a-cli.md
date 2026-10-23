@@ -1,5 +1,10 @@
 # Building a CLI with rungrad
 
+Command help explains each declared output format under "Output". For example,
+`--json` returns JSON for scripts and other programs. Generated reference pages
+also explain how to preview changes with `--dry-run`. The machine manifest
+still uses format names such as `human` and `json`.
+
 Start with `rungrad new mytool` (see [Getting started](getting-started.md)). This
 guide explains the generated code and the APIs used to turn the starter into
 your own tool. Your command does the work. rungrad handles text and JSON output,
