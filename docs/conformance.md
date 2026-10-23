@@ -176,7 +176,7 @@ For a project generated with `rungrad new mytool`, run these commands from the
 project root after installing Go:
 
 ```bash
-go install github.com/vincentsch/rungrad/cmd/rungrad@v0.3.2
+go install github.com/vincentsch/rungrad/cmd/rungrad@v0.3.3
 go build -o mytool .
 rungrad score ./mytool \
   --read "widget list" \

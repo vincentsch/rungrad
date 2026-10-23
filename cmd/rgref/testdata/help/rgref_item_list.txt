@@ -4,8 +4,12 @@ Related commands:
   rgref item get
   rgref item create
 
-Output modes:
-  human, json, plain, jq, template
+Output:
+  Shows text you can read in your terminal.
+  Use --json to get JSON for scripts and other programs.
+  Use --plain to get text without color or formatting.
+  Use --jq to filter the JSON output with a jq expression.
+  Use --template to format the output with a Go template.
 
 Usage:
   rgref item list [flags]

@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/pflag"
 	rungrad "github.com/vincentsch/rungrad"
 	"github.com/vincentsch/rungrad/internal/cmdtree"
+	"github.com/vincentsch/rungrad/internal/outputhelp"
 )
 
 // Generate walks the command tree and returns a map of relative doc path to
@@ -173,13 +174,13 @@ func renderCommand(cmd *cobra.Command, globals map[string]bool) string {
 	}
 
 	if out := cmd.Annotations[rungrad.AnnotationOutputs]; out != "" {
-		fmt.Fprintf(&b, "## Output modes\n\n%s\n\n", strings.Join(strings.Split(out, ","), ", "))
+		fmt.Fprintf(&b, "## Output\n\n%s\n\n", strings.Join(outputhelp.Descriptions(strings.Split(out, ",")), "\n\n"))
 	}
 	if cmd.Annotations[rungrad.AnnotationAuth] == "required" {
 		b.WriteString("## Authentication\n\nThis command requires a credential.\n\n")
 	}
 	if cmd.Annotations[rungrad.AnnotationMutates] == "true" {
-		b.WriteString("## Changes state\n\nThis command changes state and honors `--dry-run`.\n\n")
+		b.WriteString("## Preview changes\n\nThis command makes changes. Use `--dry-run` to see what would change without changing anything.\n\n")
 	}
 	if cmd.Annotations[rungrad.AnnotationDestructive] == "true" {
 		b.WriteString("## Destructive\n\nThis command performs a destructive action and asks for confirmation before acting. Preview it first with `--dry-run`; outside a dry run it proceeds only after explicit confirmation, and in non-interactive mode (`--json`, `--no-prompt`, or no terminal) it requires a confirmation flag instead of blocking.\n\n")

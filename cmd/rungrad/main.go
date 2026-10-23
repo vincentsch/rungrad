@@ -17,7 +17,7 @@ import (
 	"github.com/vincentsch/rungrad/scaffold"
 )
 
-const version = "v0.3.2"
+const version = "v0.3.3"
 
 func fields(s string) []string {
 	s = strings.TrimSpace(s)
@@ -48,7 +48,7 @@ func scoreCommand() *rungrad.Command {
 		},
 		Related:     []string{"rungrad new"},
 		OutputModes: []string{"table", "json"},
-		Args:        cobra.ExactArgs(1),
+		Args:        requireOneArg("target"),
 		Configure: func(cmd *cobra.Command) {
 			cmd.Flags().String("read", "", `A read command, e.g. "item list"`)
 			cmd.Flags().String("mutate", "", `A mutating command, e.g. "item create demo"`)
@@ -113,6 +113,17 @@ func scoreCommand() *rungrad.Command {
 	}
 }
 
+// requireOneArg is cobra.ExactArgs(1) with an error that names the missing
+// argument and points at help.
+func requireOneArg(argName string) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) == 1 {
+			return nil
+		}
+		return rungrad.NewError(rungrad.ExitUsage, fmt.Sprintf("%s needs one <%s> argument, got %d; see %s --help", cmd.CommandPath(), argName, len(args), cmd.CommandPath()))
+	}
+}
+
 func newCommand() *rungrad.Command {
 	return &rungrad.Command{
 		Use:         "new <name>",
@@ -121,7 +132,7 @@ func newCommand() *rungrad.Command {
 		Related:     []string{"rungrad score"},
 		OutputModes: []string{"table", "json"},
 		Mutates:     true,
-		Args:        cobra.ExactArgs(1),
+		Args:        requireOneArg("name"),
 		Configure: func(cmd *cobra.Command) {
 			cmd.Flags().String("module", "", "Go module path (default example.com/<name>)")
 			cmd.Flags().String("dir", ".", "Parent directory to create the project in")

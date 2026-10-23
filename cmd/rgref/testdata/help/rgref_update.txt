@@ -1,7 +1,8 @@
 Check for and install the latest version
 
-Output modes:
-  human, json
+Output:
+  Shows text you can read in your terminal.
+  Use --json to get JSON for scripts and other programs.
 
 Usage:
   rgref update [flags]

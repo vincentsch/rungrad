@@ -161,9 +161,11 @@ func probeNotFound(r *Runner) ProbeResult {
 	return pass("missing resource exited 5")
 }
 
-// These backend-dependent exit-code probes only run when the caller supplies a
+// probeAPIError checks the backend-error exit code. Like the other
+// backend-dependent exit-code probes, it only runs when the caller supplies a
 // safe fixture command. Without one, the scorer reports not-applicable instead
-// of guessing how to trigger an upstream failure, permission denial, or throttle.
+// of guessing how to trigger an upstream failure, permission denial, or
+// throttle.
 func probeAPIError(r *Runner) ProbeResult {
 	if r.target.APIError == nil {
 		return na("no api-error command configured")

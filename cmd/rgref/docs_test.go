@@ -132,7 +132,7 @@ func TestGeneratedDocsShape(t *testing.T) {
 		"rgref_whoami.md",
 		"rgref_update.md",
 	} {
-		if !strings.Contains(docs[page], "## Output modes") {
+		if !strings.Contains(docs[page], "## Output") {
 			t.Errorf("%s missing output modes section:\n%s", page, docs[page])
 		}
 	}

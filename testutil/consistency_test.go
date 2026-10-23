@@ -28,10 +28,10 @@ func TestCheckConsistencyClean(t *testing.T) {
 		}},
 	}
 	docs := map[string]string{
-		"tool_item_list.md": "tool item list\n\n## Output modes\n\ntable, json\n\n## Authentication\n\n## Changes state\n\n## Destructive\n\n## Metadata\n\n## Related commands\n\n- tool item create\n",
+		"tool_item_list.md": "tool item list\n\n## Output\n\nShows a table in your terminal.\n\nUse --json to get JSON for scripts and other programs.\n\n## Authentication\n\n## Preview changes\n\n## Destructive\n\n## Metadata\n\n## Related commands\n\n- tool item create\n",
 	}
 	help := map[string]string{
-		"item list": "Usage:\n  tool item list [flags]\n\nExamples:\ntool item list\n\nOutput modes:\n  table, json\nRelated commands:\n  tool item create\n",
+		"item list": "Usage:\n  tool item list [flags]\n\nExamples:\ntool item list\n\nOutput:\n  Shows a table in your terminal.\n  Use --json to get JSON for scripts and other programs.\nRelated commands:\n  tool item create\n",
 	}
 	if issues := CheckConsistency(m, docs, help); len(issues) != 0 {
 		t.Fatalf("issues = %v, want none", issues)
