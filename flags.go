@@ -34,13 +34,55 @@ func (g *GlobalFlags) register(fs *pflag.FlagSet) {
 // registerAdvanced attaches opt-in output flags. Keeping these separate means
 // existing apps do not accept modes they have not audited command by command.
 func (g *GlobalFlags) registerAdvanced(fs *pflag.FlagSet) {
-	fs.BoolVar(&g.Plain, "plain", false, "Print unstyled, copy-safe text (commands with human output)")
-	fs.StringVar(&g.JQ, "jq", "", "Transform stable JSON output with a jq expression (commands with machine output)")
-	fs.StringVar(&g.Template, "template", "", "Render stable JSON output through a Go text/template (commands with machine output)")
-	fs.BoolVar(&g.IncludeMeta, "include-meta", false, "Wrap machine output as {data, meta} (commands that expose request metadata)")
+	fs.BoolVar(&g.Plain, "plain", false, usagePlain)
+	fs.StringVar(&g.JQ, "jq", "", usageJQ)
+	fs.StringVar(&g.Template, "template", "", usageTemplate)
+	fs.BoolVar(&g.IncludeMeta, "include-meta", false, usageIncludeMeta)
 	fs.BoolVar(&g.NoColor, "no-color", false, "Disable color in human output")
 	fs.BoolVar(&g.NoANSI, "no-ansi", false, "Disable all ANSI/control sequences in human output")
 	fs.BoolVar(&g.NoPager, "no-pager", false, "Never use a pager for long human output")
+	for id, capability := range flagCapabilities {
+		markFlagCapability(fs.Lookup(id), capability)
+	}
+}
+
+// Usage strings of the output flags that only some commands accept. Help shows
+// each of them only on commands that accept it, so the text needs no caveat.
+const (
+	usagePlain       = "Print text without color or formatting"
+	usageJQ          = "Filter the JSON output with a jq expression"
+	usageTemplate    = "Format the JSON output with a Go text/template"
+	usageIncludeMeta = "Wrap the JSON output as {data, meta} with request details"
+)
+
+// flagCapabilities maps the rungrad identity of each output flag that only
+// some commands accept to the command capability it needs.
+var flagCapabilities = map[string]string{
+	"plain":        capabilityPlain,
+	"jq":           capabilityTransform,
+	"template":     capabilityTransform,
+	"include-meta": capabilityMeta,
+}
+
+const (
+	capabilityPlain     = "plain"
+	capabilityTransform = "transform"
+	capabilityMeta      = "meta"
+
+	// flagCapabilityAnnotation names the command capability a global flag
+	// needs. Help leaves the flag out on commands without it.
+	flagCapabilityAnnotation = "rungrad.requires"
+)
+
+// markFlagCapability records on f which command capability it needs.
+func markFlagCapability(f *pflag.Flag, capability string) {
+	if f == nil {
+		return
+	}
+	if f.Annotations == nil {
+		f.Annotations = map[string][]string{}
+	}
+	f.Annotations[flagCapabilityAnnotation] = []string{capability}
 }
 
 // registerResolution attaches opt-in config/auth resolution flags.

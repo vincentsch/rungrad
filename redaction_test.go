@@ -222,7 +222,7 @@ func TestOutputBoundaryRedactsSuccessModes(t *testing.T) {
 		{"human", []string{"leak"}, false},
 		{"json", []string{"leak", "--json"}, true},
 		{"plain", []string{"leak", "--plain"}, false},
-		{"jq", []string{"leak", "--jq", ".equal"}, true},
+		{"jq", []string{"leak", "--jq", ".equal"}, false},
 		{"template", []string{"leak", "--template", "{{.equal}} {{.embedded}}"}, false},
 		{"meta", []string{"leak", "--json", "--include-meta"}, true},
 	}

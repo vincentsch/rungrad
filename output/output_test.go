@@ -576,3 +576,13 @@ func TestStableJSONConcurrentCallsArePerCall(t *testing.T) {
 		}
 	}
 }
+
+func TestStableJSONKeepsHTMLCharacters(t *testing.T) {
+	got, err := StableJSON(map[string]string{"text": "<b> & </b>"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "{\n  \"text\": \"<b> & </b>\"\n}\n"; string(got) != want {
+		t.Fatalf("StableJSON = %q, want %q", got, want)
+	}
+}

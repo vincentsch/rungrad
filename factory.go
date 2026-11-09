@@ -184,7 +184,9 @@ func (f *Factory) writeResolved(machine func() ([]byte, error), human, plain fun
 		if err != nil {
 			return err
 		}
-		out = f.redactJSON(out)
+		// jq prints string results as plain text, so the text redactor runs;
+		// it also matches the JSON-escaped forms in the other results.
+		out = f.redactText(out)
 		out = output.SanitizeControlBytes(out)
 		_, err = f.Stdout.Write(out)
 		return err

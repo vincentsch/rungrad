@@ -10,6 +10,7 @@
 package output
 
 import (
+	"bytes"
 	"encoding"
 	"encoding/json"
 	"errors"
@@ -53,18 +54,22 @@ type MutationSummary struct {
 // StableJSON encodes v deterministically: two-space indentation, alphabetical
 // map keys (the encoding/json default), struct fields in declaration order, and
 // a trailing newline. Two calls with equal input produce byte-identical output.
-// A cyclic result model returns errCycle instead of recursing until the stack
-// overflows.
+// Characters such as <, > and & stay as they are; the output is not meant for
+// HTML. A cyclic result model returns errCycle instead of recursing until the
+// stack overflows.
 func StableJSON(v any) ([]byte, error) {
 	mv, err := machineValue(v)
 	if err != nil {
 		return nil, err
 	}
-	b, err := json.MarshalIndent(mv, "", "  ")
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(mv); err != nil {
 		return nil, err
 	}
-	return append(b, '\n'), nil
+	return buf.Bytes(), nil
 }
 
 var (

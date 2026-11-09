@@ -87,7 +87,7 @@ func TestAutoRegisteredAuthTokenRedactedAcrossBoundaries(t *testing.T) {
 			t.Fatalf("exit %d stderr=%q", res.Exit, res.Stderr)
 		}
 		testutil.AssertRedacted(t, res, leakToken)
-		if res.Stdout != `"[REDACTED]"`+"\n" {
+		if res.Stdout != "[REDACTED]\n" {
 			t.Fatalf("stdout = %q", res.Stdout)
 		}
 	})

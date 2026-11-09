@@ -113,8 +113,8 @@ func TestItemListIncludeMetaTransformsSeeEnvelope(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"jq request", []string{"item", "list", "--include-meta", "--jq", ".meta.request_id"}, "\"req_rgref_items_0001\"\n"},
-		{"jq data", []string{"item", "list", "--include-meta", "--jq", ".data[].name"}, "\"alpha\"\n\"dup\"\n\"dup\"\n"},
+		{"jq request", []string{"item", "list", "--include-meta", "--jq", ".meta.request_id"}, "req_rgref_items_0001\n"},
+		{"jq data", []string{"item", "list", "--include-meta", "--jq", ".data[].name"}, "alpha\ndup\ndup\n"},
 		{"template meta", []string{"item", "list", "--include-meta", "--template", "{{.meta.pagination.total_items}}"}, "3\n"},
 	}
 	for _, tt := range tests {

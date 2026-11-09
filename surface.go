@@ -219,6 +219,9 @@ func (a *App) BindGlobalFlags(fs *pflag.FlagSet, bindings GlobalFlagBindings) er
 		if f := fs.Lookup(binding.Name); f != nil && binding.Hidden {
 			f.Hidden = true
 		}
+		if capability, ok := flagCapabilities[spec.id]; ok {
+			markFlagCapability(fs.Lookup(binding.Name), capability)
+		}
 		if spec.machine {
 			// Early command-resolution errors are detected from raw argv, before
 			// parsed flag state may exist. Record the host-visible long names for
@@ -249,10 +252,10 @@ func (a *App) applicableGlobalFlagSpecs(bindings GlobalFlagBindings) []globalFla
 	}
 	if a.advancedOutput {
 		specs = append(specs,
-			globalFlagSpec{id: "plain", binding: bindings.Plain, kind: globalFlagBool, boolTarget: &a.flags.Plain, usage: "Print unstyled, copy-safe text (commands with human output)"},
-			globalFlagSpec{id: "jq", binding: bindings.JQ, kind: globalFlagString, stringTarget: &a.flags.JQ, machine: true, noShorthand: true, usage: "Transform stable JSON output with a jq expression (commands with machine output)"},
-			globalFlagSpec{id: "template", binding: bindings.Template, kind: globalFlagString, stringTarget: &a.flags.Template, machine: true, noShorthand: true, usage: "Render stable JSON output through a Go text/template (commands with machine output)"},
-			globalFlagSpec{id: "include-meta", binding: bindings.IncludeMeta, kind: globalFlagBool, boolTarget: &a.flags.IncludeMeta, usage: "Wrap machine output as {data, meta} (commands that expose request metadata)"},
+			globalFlagSpec{id: "plain", binding: bindings.Plain, kind: globalFlagBool, boolTarget: &a.flags.Plain, usage: usagePlain},
+			globalFlagSpec{id: "jq", binding: bindings.JQ, kind: globalFlagString, stringTarget: &a.flags.JQ, machine: true, noShorthand: true, usage: usageJQ},
+			globalFlagSpec{id: "template", binding: bindings.Template, kind: globalFlagString, stringTarget: &a.flags.Template, machine: true, noShorthand: true, usage: usageTemplate},
+			globalFlagSpec{id: "include-meta", binding: bindings.IncludeMeta, kind: globalFlagBool, boolTarget: &a.flags.IncludeMeta, usage: usageIncludeMeta},
 			globalFlagSpec{id: "no-color", binding: bindings.NoColor, kind: globalFlagBool, boolTarget: &a.flags.NoColor, usage: "Disable color in human output"},
 			globalFlagSpec{id: "no-ansi", binding: bindings.NoANSI, kind: globalFlagBool, boolTarget: &a.flags.NoANSI, usage: "Disable all ANSI/control sequences in human output"},
 			globalFlagSpec{id: "no-pager", binding: bindings.NoPager, kind: globalFlagBool, boolTarget: &a.flags.NoPager, usage: "Never use a pager for long human output"},

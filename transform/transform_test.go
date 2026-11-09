@@ -61,13 +61,13 @@ func TestValidateTemplate(t *testing.T) {
 
 func TestJQSuccessAndDeterminism(t *testing.T) {
 	tests := map[string]string{
-		".field":                     "\"alpha\"\n",
+		".field":                     "alpha\n",
 		".a, .b":                     "1\n2\n",
 		"{b:.b,a:.a}":                "{\"a\":1,\"b\":2}\n",
 		"[.a,.b]":                    "[1,2]\n",
 		"empty":                      "",
 		"":                           "{\"a\":1,\"b\":2,\"field\":\"alpha\",\"nested\":{\"amp\":\"a&b\",\"z\":\"last\"}}\n",
-		".nested.amp":                "\"a&b\"\n",
+		".nested.amp":                "a&b\n",
 		"{nested:.nested,b:.b,a:.a}": "{\"a\":1,\"b\":2,\"nested\":{\"amp\":\"a&b\",\"z\":\"last\"}}\n",
 	}
 	for expr, want := range tests {

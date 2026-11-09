@@ -8,13 +8,13 @@ scaffolding and scoring them.
 Install the tool:
 
 ```bash
-go install github.com/vincentsch/rungrad/cmd/rungrad@v0.3.3
+go install github.com/vincentsch/rungrad/cmd/rungrad@v0.3.4
 ```
 
 Add the framework to an existing Go module:
 
 ```bash
-go get github.com/vincentsch/rungrad@v0.3.3
+go get github.com/vincentsch/rungrad@v0.3.4
 ```
 
 ### If your shell cannot find rungrad

@@ -286,7 +286,7 @@ func TestAdvancedOutputJQSuccessAndDeterminism(t *testing.T) {
 	if first.Exit != rungrad.ExitSuccess {
 		t.Fatalf("first exit %d stderr=%q", first.Exit, first.Stderr)
 	}
-	if first.Stdout != "\"alpha\"\n" {
+	if first.Stdout != "alpha\n" {
 		t.Fatalf("jq stdout = %q", first.Stdout)
 	}
 	second := testutil.Run(app, "read", "--jq", ".field")
@@ -474,8 +474,10 @@ func TestAdvancedTerminalFlagsAndSanitization(t *testing.T) {
 	if jq.Exit != rungrad.ExitSuccess {
 		t.Fatalf("jq raw exit %d stderr=%q", jq.Exit, jq.Stderr)
 	}
-	if strings.Contains(jq.Stdout, "\x1b") || !strings.Contains(jq.Stdout, `\u001b`) {
-		t.Fatalf("jq output should be escaped JSON, got %q", jq.Stdout)
+	// A string result is printed as text, so control bytes are removed like
+	// in --template output instead of being JSON-escaped.
+	if jq.Stdout != "Bad Name\n" {
+		t.Fatalf("jq output should be sanitized text, got %q", jq.Stdout)
 	}
 }
 
@@ -533,7 +535,7 @@ func TestAdvancedPagerPolicy(t *testing.T) {
 			name:       "jq never pages",
 			args:       []string{"long", "--jq", ".ok"},
 			opts:       pagerOptions(1, "pager -x"),
-			wantStdout: "\"true\"\n",
+			wantStdout: "true\n",
 		},
 		{
 			name:       "template never pages",
@@ -934,7 +936,7 @@ func TestAdvancedTransformModesAreMachineOutput(t *testing.T) {
 	if hint.Exit != rungrad.ExitSuccess {
 		t.Fatalf("hint exit %d stderr=%q", hint.Exit, hint.Stderr)
 	}
-	if hint.Stdout != "\"alpha\"\n" {
+	if hint.Stdout != "alpha\n" {
 		t.Fatalf("hint stdout = %q", hint.Stdout)
 	}
 	if hint.Stderr != "" {
@@ -1063,5 +1065,37 @@ func assertExitStdoutEmptyStderrContains(t *testing.T, res testutil.Result, want
 	}
 	if !strings.Contains(res.Stderr, wantStderr) {
 		t.Fatalf("stderr missing %q: %q", wantStderr, res.Stderr)
+	}
+}
+
+func TestHelpListsOnlyTheGlobalFlagsACommandAccepts(t *testing.T) {
+	cases := []struct {
+		command string
+		shown   []string
+		leftOut []string
+	}{
+		{"read", []string{"--jq", "--template", "--json", "--dry-run"}, []string{"--plain", "--include-meta"}},
+		{"copy", []string{"--plain", "--json"}, []string{"--jq", "--template", "--include-meta"}},
+		{"human", []string{"--json", "--quiet"}, []string{"--plain", "--jq", "--template", "--include-meta"}},
+	}
+	for _, tc := range cases {
+		res := testutil.Run(newAdvancedOutputApp(true, nil), tc.command, "--help")
+		if res.Exit != rungrad.ExitSuccess {
+			t.Fatalf("%s --help exit %d: %s", tc.command, res.Exit, res.Stderr)
+		}
+		_, globals, ok := strings.Cut(res.Stdout, "Global Flags:")
+		if !ok {
+			t.Fatalf("%s --help has no Global Flags section:\n%s", tc.command, res.Stdout)
+		}
+		for _, flag := range tc.shown {
+			if !strings.Contains(globals, flag+" ") {
+				t.Errorf("%s --help leaves out %s:\n%s", tc.command, flag, globals)
+			}
+		}
+		for _, flag := range tc.leftOut {
+			if strings.Contains(globals, flag+" ") {
+				t.Errorf("%s --help lists %s, which the command refuses:\n%s", tc.command, flag, globals)
+			}
+		}
 	}
 }
