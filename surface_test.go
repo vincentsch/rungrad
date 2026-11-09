@@ -217,7 +217,7 @@ func TestHostOwnedGlobalsDriveRuntimeFeatures(t *testing.T) {
 	}
 
 	jq := testutil.Run(app, "list", "--query", ".name")
-	if jq.Exit != rungrad.ExitSuccess || strings.TrimSpace(jq.Stdout) != `"surface"` || jq.Stderr != "" {
+	if jq.Exit != rungrad.ExitSuccess || strings.TrimSpace(jq.Stdout) != "surface" || jq.Stderr != "" {
 		t.Fatalf("host jq result = %#v", jq)
 	}
 	tmpl := testutil.Run(app, "list", "--tmpl", "{{.name}}")
@@ -295,7 +295,7 @@ func TestHostOwnedGlobalsResetBetweenRuns(t *testing.T) {
 		t.Fatalf("json machine-output leaked state = %#v", jsonSecond)
 	}
 	first := testutil.Run(app, "list", "--query", ".name")
-	if first.Exit != rungrad.ExitSuccess || strings.TrimSpace(first.Stdout) != `"surface"` {
+	if first.Exit != rungrad.ExitSuccess || strings.TrimSpace(first.Stdout) != "surface" {
 		t.Fatalf("first transform = %#v", first)
 	}
 	second := testutil.Run(app, "list")
@@ -538,7 +538,7 @@ func TestHiddenHostBoundGlobalDrivesRuntimeButNotProjection(t *testing.T) {
 	bindings.JQ.Hidden = true
 	app := newSurfaceApp(surfaceHostSurface(bindings), nil)
 	res := testutil.Run(app, "list", "--query", ".name")
-	if res.Exit != rungrad.ExitSuccess || strings.TrimSpace(res.Stdout) != `"surface"` {
+	if res.Exit != rungrad.ExitSuccess || strings.TrimSpace(res.Stdout) != "surface" {
 		t.Fatalf("hidden host query result = %#v", res)
 	}
 	m, _ := readManifest(t, app)

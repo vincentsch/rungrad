@@ -139,6 +139,7 @@ func New(cfg AppConfig) *App {
 		// visible names stay outside rungrad's output-mode detector.
 	}
 	root.SetFlagErrorFunc(usageFlagErrorFunc)
+	useApplicableGlobalFlags(root)
 	root.PersistentPreRunE = a.preRunValidateThenAuth
 	switch surface.Completion {
 	case SurfaceHostOwned, SurfaceDisabled:

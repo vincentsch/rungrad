@@ -81,8 +81,9 @@ func ValidateTemplate(text string) error {
 	return err
 }
 
-// JQ applies expr to stableJSON and returns compact, newline-delimited JSON
-// results. Empty expr is the identity expression.
+// JQ applies expr to stableJSON and returns one result per line. A string
+// result is printed as plain text, like jq -r and gh --jq; any other result
+// as compact JSON. Empty expr is the identity expression.
 func JQ(ctx context.Context, stableJSON []byte, expr string) ([]byte, error) {
 	value, err := decodeStableJSON(stableJSON, modeJQ)
 	if err != nil {
@@ -101,6 +102,11 @@ func JQ(ctx context.Context, stableJSON []byte, expr string) ([]byte, error) {
 		}
 		if err, ok := v.(error); ok {
 			return nil, &Error{Mode: modeJQ, Stage: stageRun, Err: err}
+		}
+		if s, ok := v.(string); ok {
+			buf.WriteString(s)
+			buf.WriteByte('\n')
+			continue
 		}
 		b, err := gojq.Marshal(v)
 		if err != nil {

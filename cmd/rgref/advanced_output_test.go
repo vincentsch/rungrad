@@ -92,9 +92,9 @@ func TestItemListTransformsPreserveModel(t *testing.T) {
 	}{
 		{"jq size", []string{"item", "list", "--jq", ".[0].size"}, "9007199254740993\n"},
 		{"template size", []string{"item", "list", "--template", "{{(index . 0).size}}"}, "9007199254740993\n"},
-		{"jq label", []string{"item", "list", "--jq", ".[0].label"}, "\"A&B <demo> café\"\n"},
+		{"jq label", []string{"item", "list", "--jq", ".[0].label"}, "A&B <demo> café\n"},
 		{"template label", []string{"item", "list", "--template", "{{(index . 0).label}}"}, "A&B <demo> café\n"},
-		{"jq names", []string{"item", "list", "--jq", ".[].name"}, "\"alpha\"\n\"dup\"\n\"dup\"\n"},
+		{"jq names", []string{"item", "list", "--jq", ".[].name"}, "alpha\ndup\ndup\n"},
 		{"template rows", []string{"item", "list", "--template", `{{range .}}{{.id}} {{.name}}{{"\n"}}{{end}}`}, "1 alpha\n2 dup\n3 dup\n"},
 	}
 	for _, tt := range tests {
@@ -116,7 +116,7 @@ func TestItemGetTransforms(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"jq", []string{"item", "get", "alpha", "--jq", ".id"}, "\"1\"\n"},
+		{"jq", []string{"item", "get", "alpha", "--jq", ".id"}, "1\n"},
 		{"template", []string{"item", "get", "alpha", "--template", "{{.id}}"}, "1\n"},
 	}
 	for _, tt := range tests {

@@ -230,10 +230,10 @@ func TestManifestAdvancedOutputFlagsAndModes(t *testing.T) {
 		typ  string
 		want string
 	}{
-		{"plain", "bool", "Print unstyled"},
-		{"jq", "string", "Transform stable JSON"},
-		{"template", "string", "Render stable JSON"},
-		{"include-meta", "bool", "Wrap machine output"},
+		{"plain", "bool", "Print text without color"},
+		{"jq", "string", "Filter the JSON output"},
+		{"template", "string", "Format the JSON output"},
+		{"include-meta", "bool", "Wrap the JSON output"},
 		{"no-color", "bool", "Disable color"},
 		{"no-ansi", "bool", "Disable all ANSI"},
 		{"no-pager", "bool", "Never use a pager"},

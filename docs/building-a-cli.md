@@ -406,10 +406,18 @@ active, framework prompts are disabled, `Infof` hints are suppressed, and
 escape-free and never paged.
 
 Transform output is deterministic for identical inputs: stable JSON goes in,
-`gojq` emits compact JSON with sorted object keys, templates normalize to one
-final newline, and results are fully buffered before stdout is written. The
-output boundary sanitizes template output too, so a template that prints a raw
-control byte from a string field still produces copy-safe stdout.
+a jq result that is a string prints as plain text (like `jq -r` and `gh --jq`),
+other jq results print as compact JSON with sorted object keys, templates
+normalize to one final newline, and results are fully buffered before stdout is
+written. The output boundary sanitizes jq and template output, so a result that
+holds a raw control byte from a string field still produces copy-safe stdout.
+
+Stable JSON keeps characters such as `<`, `>` and `&` as they are instead of
+writing `\u003c`, `\u003e` and `\u0026`.
+
+Help lists `--plain`, `--jq`, `--template` and `--include-meta` under Global
+Flags only on commands that accept them, so a command's help shows the output
+flags it supports and no others.
 
 Advanced human output is also buffered so long listings can be paged. The pager
 is selected from `<TOOL>_PAGER`, then `PAGER`, then `less -FRX` on non-Windows

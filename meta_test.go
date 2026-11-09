@@ -206,10 +206,10 @@ func TestIncludeMetaTransformsSeeEnvelope(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"jq meta", []string{"show", "--include-meta", "--jq", ".meta.request_id"}, "\"req-1\"\n"},
-		{"jq data", []string{"show", "--include-meta", "--jq", ".data.id"}, "\"alpha\"\n"},
+		{"jq meta", []string{"show", "--include-meta", "--jq", ".meta.request_id"}, "req-1\n"},
+		{"jq data", []string{"show", "--include-meta", "--jq", ".data.id"}, "alpha\n"},
 		{"template meta", []string{"show", "--include-meta", "--template", "{{.meta.pagination.total_items}}"}, "5\n"},
-		{"jq without meta", []string{"show", "--jq", ".id"}, "\"alpha\"\n"},
+		{"jq without meta", []string{"show", "--jq", ".id"}, "alpha\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
