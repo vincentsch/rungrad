@@ -73,15 +73,26 @@ func CheckConsistency(m manifest.Manifest, docs, help map[string]string) []strin
 		if c.Mutates && !strings.Contains(docText, "## Preview changes") {
 			issues = append(issues, fmt.Sprintf("%s: changes-state section missing from docs", label))
 		}
-		if c.Destructive && !strings.Contains(docText, "## Destructive") {
-			issues = append(issues, fmt.Sprintf("%s: destructive section missing from docs", label))
+		if c.Destructive && !strings.Contains(docText, "## Confirmation") {
+			issues = append(issues, fmt.Sprintf("%s: confirmation section missing from docs", label))
 		}
-		if c.SupportsMeta && !strings.Contains(docText, "## Metadata") {
-			issues = append(issues, fmt.Sprintf("%s: metadata section missing from docs", label))
+		// The request details section needs the --include-meta flag, which a
+		// tool only has with its advanced output modes.
+		if c.SupportsMeta && hasGlobalFlag(m, "include-meta") && !strings.Contains(docText, "## Request details") {
+			issues = append(issues, fmt.Sprintf("%s: request details section missing from docs", label))
 		}
 	}
 	sort.Strings(issues)
 	return issues
+}
+
+func hasGlobalFlag(m manifest.Manifest, name string) bool {
+	for _, f := range m.GlobalFlags {
+		if f.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // AssertConsistent captures the manifest, generated docs, and all help from

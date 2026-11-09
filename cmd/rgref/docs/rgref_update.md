@@ -28,4 +28,4 @@ Use --json to get JSON for scripts and other programs.
 
 ## Preview changes
 
-This command makes changes. Use `--dry-run` to see what would change without changing anything.
+This command changes things. Add `--dry-run` to see what it would change; nothing changes then.

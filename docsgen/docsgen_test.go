@@ -245,7 +245,7 @@ func TestResolutionDocsRenderFlagsAndCompactOmission(t *testing.T) {
 func TestMetadataCommandRendersMetadataSection(t *testing.T) {
 	docs := docsgen.Generate(metaApp())
 	page := docs["rgmeta_show.md"]
-	if !strings.Contains(page, "## Metadata") || !strings.Contains(page, "--include-meta") || !strings.Contains(page, "supported machine output mode") {
+	if !strings.Contains(page, "## Request details") || !strings.Contains(page, "`--include-meta`") || !strings.Contains(page, "{data, meta}") {
 		t.Fatalf("metadata command page missing metadata section:\n%s", page)
 	}
 	jsonOnly := docs["rgmeta_jsononly.md"]
@@ -254,7 +254,7 @@ func TestMetadataCommandRendersMetadataSection(t *testing.T) {
 	}
 
 	plain := docsgen.Generate(demoApp())["rgdemo_ping.md"]
-	if strings.Contains(plain, "## Metadata") {
+	if strings.Contains(plain, "## Request details") {
 		t.Fatalf("non-metadata command page unexpectedly has metadata section:\n%s", plain)
 	}
 }
@@ -317,7 +317,7 @@ func TestDestructiveCommandRendersBothSections(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing delete page; got %v", keys(docs))
 	}
-	for _, want := range []string{"## Destructive", "## Preview changes", "Use `--dry-run` to see what would change without changing anything.", "- `--confirm`"} {
+	for _, want := range []string{"## Confirmation", "## Preview changes", "Add `--dry-run` to see what it would change; nothing changes then.", "- `--confirm`"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("delete page missing %q:\n%s", want, page)
 		}
