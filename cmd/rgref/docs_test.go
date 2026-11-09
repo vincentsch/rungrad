@@ -107,7 +107,7 @@ func TestGeneratedDocsShape(t *testing.T) {
 
 	// item delete: destructive section and the local --confirm flag.
 	del := docs["rgref_item_delete.md"]
-	for _, w := range []string{"## Destructive", "- `--confirm`"} {
+	for _, w := range []string{"## Confirmation", "- `--confirm`"} {
 		if !strings.Contains(del, w) {
 			t.Errorf("rgref_item_delete.md missing %q:\n%s", w, del)
 		}
@@ -118,9 +118,9 @@ func TestGeneratedDocsShape(t *testing.T) {
 		t.Errorf("rgref_whoami.md missing authentication section:\n%s", w)
 	}
 
-	// item list: metadata section.
-	if l := docs["rgref_item_list.md"]; !strings.Contains(l, "## Metadata") {
-		t.Errorf("rgref_item_list.md missing metadata section:\n%s", l)
+	// item list: request details section.
+	if l := docs["rgref_item_list.md"]; !strings.Contains(l, "## Request details") {
+		t.Errorf("rgref_item_list.md missing request details section:\n%s", l)
 	}
 
 	// Output modes for read/mutate/update commands.

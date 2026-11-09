@@ -27,11 +27,11 @@ Use --json to get JSON for scripts and other programs.
 
 ## Preview changes
 
-This command makes changes. Use `--dry-run` to see what would change without changing anything.
+This command changes things. Add `--dry-run` to see what it would change; nothing changes then.
 
-## Destructive
+## Confirmation
 
-This command performs a destructive action and asks for confirmation before acting. Preview it first with `--dry-run`; outside a dry run it proceeds only after explicit confirmation, and in non-interactive mode (`--json`, `--no-prompt`, or no terminal) it requires a confirmation flag instead of blocking.
+This command deletes or overwrites something, so it asks before it acts. Preview it with `--dry-run` first. It doesn't ask when there is no terminal or when you pass `--json` or `--no-prompt`; then it needs its confirmation flag.
 
 ## Related commands
 

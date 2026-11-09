@@ -69,9 +69,11 @@ const (
 	capabilityTransform = "transform"
 	capabilityMeta      = "meta"
 
-	// flagCapabilityAnnotation names the command capability a global flag
-	// needs. Help leaves the flag out on commands without it.
-	flagCapabilityAnnotation = "rungrad.requires"
+	// FlagCapabilityAnnotation names the command capability a global flag
+	// needs ("plain", "transform" or "meta"). Help leaves the flag out on
+	// commands without it, and generated docs read it to name the flag.
+	FlagCapabilityAnnotation = "rungrad.requires"
+	flagCapabilityAnnotation = FlagCapabilityAnnotation
 )
 
 // markFlagCapability records on f which command capability it needs.

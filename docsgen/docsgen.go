@@ -180,16 +180,15 @@ func renderCommand(cmd *cobra.Command, globals map[string]bool) string {
 		b.WriteString("## Authentication\n\nThis command requires a credential.\n\n")
 	}
 	if cmd.Annotations[rungrad.AnnotationMutates] == "true" {
-		b.WriteString("## Preview changes\n\nThis command makes changes. Use `--dry-run` to see what would change without changing anything.\n\n")
+		b.WriteString("## Preview changes\n\nThis command changes things. Add `--dry-run` to see what it would change; nothing changes then.\n\n")
 	}
 	if cmd.Annotations[rungrad.AnnotationDestructive] == "true" {
-		b.WriteString("## Destructive\n\nThis command performs a destructive action and asks for confirmation before acting. Preview it first with `--dry-run`; outside a dry run it proceeds only after explicit confirmation, and in non-interactive mode (`--json`, `--no-prompt`, or no terminal) it requires a confirmation flag instead of blocking.\n\n")
+		b.WriteString("## Confirmation\n\nThis command deletes or overwrites something, so it asks before it acts. Preview it with `--dry-run` first. It doesn't ask when there is no terminal or when you pass `--json` or `--no-prompt`; then it needs its confirmation flag.\n\n")
 	}
-	if cmd.Annotations[rungrad.AnnotationMeta] == "true" {
-		// SupportsMeta is independent of transform support and app-level advanced
-		// output registration, so avoid naming --jq/--template unless the user
-		// sees those modes elsewhere on the page.
-		b.WriteString("## Metadata\n\nThis command can attach request metadata. In advanced-output apps, add `--include-meta` to a supported machine output mode to wrap the result as `{data, meta}`.\n\n")
+	if flag := metaFlag(cmd); flag != "" && cmd.Annotations[rungrad.AnnotationMeta] == "true" {
+		// The section only appears when the tool has the flag, which it
+		// registers with its advanced output modes.
+		fmt.Fprintf(&b, "## Request details\n\nAdd `--%s` to the JSON output to get the result as `{data, meta}`, where `meta` holds details about the request.\n\n", flag)
 	}
 	if rel := cmd.Annotations[rungrad.AnnotationRelated]; rel != "" {
 		b.WriteString("## Related commands\n\n")
@@ -201,6 +200,18 @@ func renderCommand(cmd *cobra.Command, globals map[string]bool) string {
 	// Section renderers naturally leave a blank line after the last section.
 	// Commit generated pages with one final newline, not an extra blank line.
 	return strings.TrimRight(b.String(), "\n") + "\n"
+}
+
+// metaFlag returns the name of the flag that wraps output as {data, meta},
+// or "" when the tool has none.
+func metaFlag(cmd *cobra.Command) string {
+	name := ""
+	cmd.Root().PersistentFlags().VisitAll(func(f *pflag.Flag) {
+		if need := f.Annotations[rungrad.FlagCapabilityAnnotation]; len(need) > 0 && need[0] == "meta" && !f.Hidden {
+			name = f.Name
+		}
+	})
+	return name
 }
 
 func usageLine(cmd *cobra.Command) string {
